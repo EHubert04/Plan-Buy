@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Plan & Buy</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+</head>
+<body>
+
+<header>📝 Plan & Buy</header>
+
+<main>
+  <section class="card">
+    <h2>Planung</h2>
+    <input id="planInput" placeholder="Aufgabe oder Termin" />
+    <button onclick="addItem('plan')">Hinzufügen</button>
+    <ul id="planList"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Einkaufsliste</h2>
+    <input id="shopInput" placeholder="Produkt hinzufügen" />
+    <button onclick="addItem('shop')">Hinzufügen</button>
+    <ul id="shopList"></ul>
+  </section>
+</main>
+
+</body>
+</html>
