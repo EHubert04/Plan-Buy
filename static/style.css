@@ -1,85 +1,34 @@
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f5f7fa;
   margin: 0;
-  padding: 0;
+  font-family: sans-serif;
 }
 
-header {
-  background: #4f46e5;
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  background: #2c2f33;
   color: white;
   padding: 1rem;
-  text-align: center;
-  font-size: 1.4rem;
-  font-weight: bold;
+}
+
+.sidebar a {
+  display: block;
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+}
+
+.sidebar a:hover {
+  background: #444;
 }
 
 main {
-  max-width: 900px;
-  margin: auto;
-  padding: 1rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-.card {
-  background: white;
-  border-radius: 16px;
-  padding: 1rem;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-}
-
-h2 {
-  margin-top: 0;
-}
-
-input, button {
-  padding: 0.6rem;
-  font-size: 1rem;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-}
-
-button {
-  background: #4f46e5;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-button:hover {
-  opacity: 0.9;
-}
-
-ul {
-  list-style: none;
-  padding: 0;
-}
-
-li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.4rem 0;
-  border-bottom: 1px solid #eee;
-}
-
-li.done span {
-  text-decoration: line-through;
-  color: #888;
-}
-
-.delete {
-  background: transparent;
-  color: #e11d48;
-  font-weight: bold;
-  border: none;
-  cursor: pointer;
-}
-
-@media (max-width: 700px) {
-  main {
-    grid-template-columns: 1fr;
-  }
+  flex: 1;
+  padding: 1.5rem;
 }
