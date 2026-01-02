@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Planungs-App</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h2>🧱 Planer</h2>
+
+    <a
+      hx-get="/planning"
+      hx-target="#content"
+      hx-swap="innerHTML">
+      🗓 Planung
+    </a>
+
+    <a
+      hx-get="/shopping"
+      hx-target="#content"
+      hx-swap="innerHTML">
+      🛒 Einkauf
+    </a>
+  </aside>
+
+  <main id="content">
+    <p>Bitte wähle links eine Ansicht.</p>
+  </main>
+</div>
+
+</body>
+</html>

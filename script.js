@@ -15,7 +15,7 @@ function addItem(type) {
 
   // Abhaken
   span.addEventListener("click", () => {
-    li.classList.toggle("done");
+    li.classList.toggle("done");  
   });
 
   // Löschen
