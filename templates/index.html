@@ -2,35 +2,51 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Planungs-Tool</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Projekt Planer</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="container">
-        <nav class="sidebar">
-            <h2>Planer</h2>
-            <ul>
-                <li><a href="#" onclick="showSection('tasks')">Aufgaben</a></li>
-                <li><a href="#" onclick="showSection('resources')">Einkaufsliste</a></li>
-            </ul>
-        </nav>
+    <nav class="sidebar">
+        <h2>Smart Planner</h2>
+        <ul id="side-nav" class="project-nav"></ul>
+        <button class="btn-new-project" onclick="addProject()">+ Neues Projekt</button>
+    </nav>
 
-        <main class="content">
-            <div id="tasks" class="section">
-                <h1>Meine Aufgaben</h1>
-                <ul id="task-list"></ul>
-                <input type="text" id="task-input" placeholder="Neue Aufgabe...">
-                <button onclick="addItem('task')">Hinzufügen</button>
+    <main class="content">
+        <div id="dashboard">
+            <div class="header">
+                <h1>Meine Projekte</h1>
             </div>
+            <div id="project-grid" class="grid"></div>
+        </div>
 
-            <div id="resources" class="section" style="display:none;">
-                <h1>Einkaufsliste / Ressourcen</h1>
-                <ul id="resource-list"></ul>
-                <input type="text" id="resource-input" placeholder="Ressource...">
-                <button onclick="addItem('resource')">Hinzufügen</button>
+        <div id="project-detail" style="display:none;">
+            <div class="header">
+                <h1 id="detail-title">Projektname</h1>
+                <button onclick="showDashboard()" style="background:none; border:none; color:#6366f1; cursor:pointer;">&larr; Zurück</button>
             </div>
-        </main>
-    </div>
-    <script src="script.js"></script>
+            
+            <div class="lists-container">
+                <div class="list-box">
+                    <h3>✅ To-Do Liste</h3>
+                    <ul id="todo-list"></ul>
+                    <div class="input-group">
+                        <input type="text" id="todo-input" placeholder="Neue Aufgabe...">
+                        <button class="btn-add" onclick="saveItem('todo')">Hinzufügen</button>
+                    </div>
+                </div>
+                <div class="list-box">
+                    <h3>🛒 Einkaufsliste</h3>
+                    <ul id="res-list"></ul>
+                    <div class="input-group">
+                        <input type="text" id="res-input" placeholder="Neue Ressource...">
+                        <button class="btn-add" onclick="saveItem('resource')">Hinzufügen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/static/script.js"></script>
 </body>
 </html>

@@ -1,38 +1,70 @@
-function showSection(sectionId) {
-    // Alle Sektionen ausblenden
-    document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
-    // Gewünschte Sektion anzeigen
-    document.getElementById(sectionId).style.display = 'block';
+let currentProjectId = null;
+let allProjects = [];
+
+async function loadData() {
+    const res = await fetch('/api/projects');
+    allProjects = await res.json();
+    renderUI();
 }
 
-async function addItem(type) {
-    const input = document.getElementById(`${type}-input`);
-    const val = input.value;
+function renderUI() {
+    const nav = document.getElementById('side-nav');
+    const grid = document.getElementById('project-grid');
     
-    if (!val) return;
+    nav.innerHTML = '';
+    grid.innerHTML = '';
 
-    // An Python Backend senden
-    await fetch('http://127.0.0.1:5000/add_item', {
+    allProjects.forEach(p => {
+        nav.innerHTML += `<li onclick="openProject(${p.id})">${p.name}</li>`;
+        grid.innerHTML += `
+            <div class="card" onclick="openProject(${p.id})">
+                <h3>${p.name}</h3>
+                <p>${p.todos.length} Aufgaben</p>
+            </div>`;
+    });
+}
+
+async function addProject() {
+    const name = prompt("Projektname:");
+    if (!name) return;
+    await fetch('/api/projects', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ item: val, category: type === 'task' ? 'tasks' : 'resources' })
+        body: JSON.stringify({name})
+    });
+    loadData();
+}
+
+function openProject(id) {
+    currentProjectId = id;
+    const project = allProjects.find(p => p.id === id);
+    
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('project-detail').style.display = 'block';
+    document.getElementById('detail-title').innerText = project.name;
+
+    document.getElementById('todo-list').innerHTML = project.todos.map(i => `<li>${i}</li>`).join('');
+    document.getElementById('res-list').innerHTML = project.resources.map(i => `<li>${i}</li>`).join('');
+}
+
+async function saveItem(type) {
+    const input = document.getElementById(type === 'todo' ? 'todo-input' : 'res-input');
+    const content = input.value;
+    if (!content) return;
+
+    await fetch(`/api/projects/${currentProjectId}/items`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({type, content})
     });
 
     input.value = '';
-    loadData(); // Liste aktualisieren
+    loadData().then(() => openProject(currentProjectId));
 }
 
-async function loadData() {
-    const response = await fetch('http://127.0.0.1:5000/get_data');
-    const result = await response.json();
-    
-    // Listen im HTML füllen (Beispiel für Tasks)
-    const taskList = document.getElementById('task-list');
-    taskList.innerHTML = result.tasks.map(t => `<li>${t}</li>`).join('');
-    
-    const resList = document.getElementById('resource-list');
-    resList.innerHTML = result.resources.map(r => `<li>${r}</li>`).join('');
+function showDashboard() {
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('project-detail').style.display = 'none';
 }
 
-// Initial laden
 loadData();
