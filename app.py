@@ -1,8 +1,8 @@
 from flask import Flask, jsonify, request
-from flask_cors import CORS # Verhindert Probleme beim lokalen Testen
+
 
 app = Flask(__name__)
-CORS(app)
+
 
 # Temporärer Speicher (später eine Datenbank wie SQLite)
 data = {
