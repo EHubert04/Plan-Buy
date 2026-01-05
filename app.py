@@ -1,25 +1,38 @@
-from flask import Flask, jsonify, request
-
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
+# Wir nutzen eine einfache Liste als "Datenbank-Ersatz"
+# Jeder Eintrag ist ein Dictionary: {"content": "Text", "category": "task"}
+data_storage = []
 
-# Temporärer Speicher (später eine Datenbank wie SQLite)
-data = {
-    "tasks": ["Projekt planen", "Code schreiben"],
-    "resources": ["Laptop", "Kaffee"]
-}
+# Routen
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/get_data', methods=['GET'])
 def get_data():
-    return jsonify(data)
+    # Wir filtern die Liste manuell nach Kategorien
+    tasks = [item['content'] for item in data_storage if item['category'] == 'task']
+    resources = [item['content'] for item in data_storage if item['category'] == 'resource']
+    
+    return jsonify({
+        "tasks": tasks,
+        "resources": resources
+    })
 
 @app.route('/add_item', methods=['POST'])
 def add_item():
-    item = request.json.get('item')
-    category = request.json.get('category') # 'tasks' oder 'resources'
-    if category in data:
-        data[category].append(item)
+    data = request.json
+    
+    # Neuen Eintrag direkt in die Liste speichern
+    new_entry = {
+        "content": data['item'],
+        "category": data['category']
+    }
+    data_storage.append(new_entry)
+    
     return jsonify({"status": "success"})
 
 if __name__ == '__main__':
