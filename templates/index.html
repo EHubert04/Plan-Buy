@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Planungs-Tool</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <h2>Planer</h2>
+            <ul>
+                <li><a href="#" onclick="showSection('tasks')">Aufgaben</a></li>
+                <li><a href="#" onclick="showSection('resources')">Einkaufsliste</a></li>
+            </ul>
+        </nav>
+
+        <main class="content">
+            <div id="tasks" class="section">
+                <h1>Meine Aufgaben</h1>
+                <ul id="task-list"></ul>
+                <input type="text" id="task-input" placeholder="Neue Aufgabe...">
+                <button onclick="addItem('task')">Hinzufügen</button>
+            </div>
+
+            <div id="resources" class="section" style="display:none;">
+                <h1>Einkaufsliste / Ressourcen</h1>
+                <ul id="resource-list"></ul>
+                <input type="text" id="resource-input" placeholder="Ressource...">
+                <button onclick="addItem('resource')">Hinzufügen</button>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
