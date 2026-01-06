@@ -76,6 +76,7 @@ li {
   border: 2px solid transparent; /* unsichtbare Border für sanfte Animation */
   border-radius: 8px;
   transition: border 0.3s, background-color 0.3s;
+  cursor: grab;
 }
 
 /* Hover-Effekt */
@@ -83,4 +84,12 @@ li:hover {
   border: 2px solid #007BFF; /* blaue Umrandung beim Hover */
   background-color: #f0f8ff; /* optional: leichtes Highlight */
   cursor: pointer;
+}
+li:active {
+  cursor: grabbing;
+}
+
+li.dragging {
+  opacity: 0.5;
+  background-color: #e0f2fe;
 }

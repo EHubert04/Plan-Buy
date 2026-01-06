@@ -67,4 +67,56 @@ function showDashboard() {
     document.getElementById('project-detail').style.display = 'none';
 }
 
+//Drag and Drop Funktion 
+function initSortableList(listElement) {
+    if (!listElement) return;
+
+    let draggedItem = null;
+
+    listElement.querySelectorAll("li").forEach(li => {
+        li.setAttribute("draggable", "true");
+
+        li.addEventListener("dragstart", () => {
+            draggedItem = li;
+            li.classList.add("dragging");
+        });
+
+        li.addEventListener("dragend", () => {
+            li.classList.remove("dragging");
+            draggedItem = null;
+        });
+    });
+
+    listElement.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(listElement, e.clientY);
+        if (!draggedItem) return;
+
+        if (afterElement == null) {
+            listElement.appendChild(draggedItem);
+        } else {
+            listElement.insertBefore(draggedItem, afterElement);
+        }
+    });
+}
+
+function getDragAfterElement(container, y) {
+    const elements = [...container.querySelectorAll("li:not(.dragging)")];
+
+    return elements.reduce(
+        (closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+
+            if (offset < 0 && offset > closest.offset) {
+                return { offset, element: child };
+            } else {
+                return closest;
+            }
+        },
+        { offset: Number.NEGATIVE_INFINITY }
+    ).element;
+}
+
+
 loadData();
