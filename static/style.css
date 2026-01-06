@@ -1,67 +1,70 @@
-body {
-  margin: 0;
-  font-family: sans-serif;
-  display: flex;
+:root {
+    --sidebar-bg: #1e293b;
+    --main-bg: #f8fafc;
+    --accent: #6366f1;
+    --text-main: #334155;
 }
 
-.layout {
-  display: flex;
-  height: 100vh;
-}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
 
+body { display: flex; min-height: 100vh; background: var(--main-bg); color: var(--text-main); }
+
+/* Sidebar */
 .sidebar {
-  height: 100vh;
-  width: 250px;
-  background: #2c2f33;
-  color: white;
-  position: fixed;
-  transition: transform 0.3s ease;
-  z-index: 1000;
+    width: 280px;
+    background: var(--sidebar-bg);
+    color: white;
+    padding: 2rem 1.5rem;
+    position: fixed;
+    height: 100vh;
 }
 
-.sidebar a {
-  display: block;
-  color: white;
-  text-decoration: none;
-  padding: 0.5rem;
-  margin-bottom: 0.5rem;
-  border-radius: 4px;
+.sidebar h2 { font-size: 0.8rem; text-transform: uppercase; color: #94a3b8; margin-bottom: 1.5rem; letter-spacing: 1px; }
+
+.project-nav { list-style: none; margin-bottom: 2rem; }
+.project-nav li { 
+    padding: 10px 15px; 
+    border-radius: 8px; 
+    cursor: pointer; 
+    margin-bottom: 5px;
+    transition: 0.2s;
+}
+.project-nav li:hover { background: #334155; }
+.project-nav li.active { background: var(--accent); }
+
+.btn-new-project {
+    width: 100%;
+    padding: 10px;
+    background: transparent;
+    border: 1px dashed #64748b;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
 }
 
-.sidebar a:hover {
-  background: #444;
-}
+/* Main Content */
+.content { margin-left: 280px; flex: 1; padding: 3rem; }
 
-main {
-  flex: 1;
-  padding: 1.5rem;
-}
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
 
-/* Project card styles and hover similar behavior */
-.card {
-  background: white;
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.06);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-.card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-}
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; }
 
-/* Hover for todo/resource list items to match project interaction */
-.lists-container .list-box ul li {
-  padding: 0.5rem 0.6rem;
-  border-radius: 8px;
-  transition: background 0.12s ease, color 0.12s ease;
+.card { 
+    background: white; 
+    padding: 1.5rem; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
+    cursor: pointer;
+    transition: 0.3s;
 }
-.lists-container .list-box ul li:hover {
-  background: rgba(99,102,241,0.06);
-  cursor: pointer;
-}
+.card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
 
-/* Slight emphasis for the headers inside project detail */
-.lists-container .list-box h3 {
-  margin-top: 0;
-}
+/* Detail View */
+.lists-container { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; }
+.list-box { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #e2e8f0; }
+.input-group { display: flex; gap: 10px; margin-top: 15px; }
+input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; }
+.btn-add { background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+
+ul { list-style: none; margin-top: 1rem; }
+li { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
