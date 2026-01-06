@@ -45,6 +45,9 @@ function openProject(id) {
 
     document.getElementById('todo-list').innerHTML = project.todos.map(i => `<li>${i}</li>`).join('');
     document.getElementById('res-list').innerHTML = project.resources.map(i => `<li>${i}</li>`).join('');
+
+    initSortableList(document.getElementById('todo-list'));
+    initSortableList(document.getElementById('res-list'));
 }
 
 async function saveItem(type) {
@@ -67,14 +70,15 @@ function showDashboard() {
     document.getElementById('project-detail').style.display = 'none';
 }
 
-//Drag and Drop Funktion 
+// --- Drag & Drop für Listen ---
 function initSortableList(listElement) {
     if (!listElement) return;
 
     let draggedItem = null;
 
+    // Setze alle Listeneinträge auf draggable
     listElement.querySelectorAll("li").forEach(li => {
-        li.setAttribute("draggable", "true");
+        li.draggable = true;
 
         li.addEventListener("dragstart", () => {
             draggedItem = li;
@@ -87,6 +91,7 @@ function initSortableList(listElement) {
         });
     });
 
+    // Dragover Event für Drop
     listElement.addEventListener("dragover", (e) => {
         e.preventDefault();
         const afterElement = getDragAfterElement(listElement, e.clientY);
@@ -102,21 +107,21 @@ function initSortableList(listElement) {
 
 function getDragAfterElement(container, y) {
     const elements = [...container.querySelectorAll("li:not(.dragging)")];
+    let closest = null;
+    let closestOffset = Number.NEGATIVE_INFINITY;
 
-    return elements.reduce(
-        (closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
+    elements.forEach(child => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closestOffset) {
+            closestOffset = offset;
+            closest = child;
+        }
+    });
 
-            if (offset < 0 && offset > closest.offset) {
-                return { offset, element: child };
-            } else {
-                return closest;
-            }
-        },
-        { offset: Number.NEGATIVE_INFINITY }
-    ).element;
+    return closest;
 }
+
 
 
 loadData();
