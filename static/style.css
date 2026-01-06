@@ -9,7 +9,7 @@
 
 body { display: flex; min-height: 100vh; background: var(--main-bg); color: var(--text-main); }
 
-/* Sidebar */
+/* Seitenleiste als Menü */
 .sidebar {
     width: 280px;
     background: var(--sidebar-bg);
@@ -67,4 +67,20 @@ input { flex: 1; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6p
 .btn-add { background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
 
 ul { list-style: none; margin-top: 1rem; }
-li { padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.95rem; }
+
+/* Hover für Listeneinträge */
+li {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.95rem;
+  border: 2px solid transparent; /* unsichtbare Border für sanfte Animation */
+  border-radius: 8px;
+  transition: border 0.3s, background-color 0.3s;
+}
+
+/* Hover-Effekt */
+li:hover {
+  border: 2px solid #007BFF; /* blaue Umrandung beim Hover */
+  background-color: #f0f8ff; /* optional: leichtes Highlight */
+  cursor: pointer;
+}
