@@ -29,8 +29,6 @@ body { display: flex; min-height: 100vh; background: var(--main-bg); color: var(
     margin-bottom: 5px;
     transition: 0.2s;
 }
-.project-nav li:hover { background: #334155; }
-.project-nav li.active { background: var(--accent); }
 
 .btn-new-project {
     width: 100%;
@@ -93,3 +91,6 @@ li.dragging {
   opacity: 0.5;
   background-color: #e0f2fe;
 }
+
+.project-nav li:hover { background: #334155; }
+.project-nav li.active { background: var(--accent); }
