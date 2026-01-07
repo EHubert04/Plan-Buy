@@ -8,7 +8,7 @@ projects = [
         "id": 1, 
         "name": "Mein erstes Projekt", 
         "todos": ["Beispiel-Aufgabe"], 
-        "resources": ["Beispiel-Einkauf"]
+        "resources": ["Beispiel-Einkauf", 1]
     }
 ]
 
@@ -44,9 +44,11 @@ def add_item(p_id):
         if data['type'] == 'todo':
             project['todos'].append(data['content'])
         else:
-            project['resources'].append(data['content'])
-        return jsonify({"status": "success"})
-    return jsonify({"error": "Project not found"}), 404
+            quantity = data.get('quantity', 1)  # default 1, falls nicht übergeben
+            project['resources'].append({
+                "name": data['content'],
+                "quantity": quantity})
+        return jsonify(project)
 
 if __name__ == '__main__':
     app.run(debug=True)

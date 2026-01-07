@@ -58,6 +58,7 @@ function openProject(id) {
       <li>
         <label>
           <input type="checkbox" class="res-checkbox" data-index="${index}">
+          <input type="number" class="res-quantity" min="1" value="${res.quantity}" data-index="${index}">
           <span class="res-text">${res}</span>
         </label>
       </li>
