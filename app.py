@@ -44,7 +44,7 @@ def add_item(p_id):
         if data['type'] == 'todo':
             project['todos'].append(data['content'])
         else:
-            quantity = data.get('quantity', 1)  # default 1, falls nicht übergeben
+            quantity = data.get('quantity', 1) 
             project['resources'].append({
                 "name": data['content'],
                 "quantity": quantity})

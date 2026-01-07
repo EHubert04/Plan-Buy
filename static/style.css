@@ -114,7 +114,7 @@ li.completed .res-text {
 }
 
 .res-quanity{
-  width: 45px;
+  width: 50px;
 }
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }
