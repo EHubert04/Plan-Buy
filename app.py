@@ -8,7 +8,7 @@ projects = [
         "id": 1, 
         "name": "Mein erstes Projekt", 
         "todos": ["Beispiel-Aufgabe"], 
-        "resources": [{"Beispiel-Einkauf", 1}]
+        "resources": [{name:"Beispiel-Einkauf", "quantity": 1}]
     }
 ]
 

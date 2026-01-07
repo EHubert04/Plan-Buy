@@ -57,7 +57,7 @@ function openProject(id) {
     project.resources.map((res, index) => `
     <li>
       <span class="res-text">${res.name}</span>
-      <input type="number" class="res-quantity" value="${res.quantity}" min="1" data-index="${index}">
+      <input type="number" class="res-quantity" style = "width:50px" value="${res.quantity}" min="1" data-index="${index}">
       <input type="checkbox" class="res-checkbox" data-index="${index}">
     </li>
   `).join('');
