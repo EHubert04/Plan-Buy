@@ -95,6 +95,7 @@ li.dragging {
 li .todo-checkbox {
   float: right;          
   cursor: pointer;
+  transform: scale(1.5);
 }
 li.completed .todo-text {
   text-decoration: line-through;
@@ -103,6 +104,7 @@ li.completed .todo-text {
 li .res-checkbox {
   float: right;           
   cursor: pointer;
+  transform: scale(1.5);
 }
 li.completed .res-text {
   text-decoration: line-through;
