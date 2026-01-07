@@ -113,5 +113,8 @@ li.completed .res-text {
   color: #a0a0a0;
 }
 
+.res-quanity{
+  width: 45px;
+}
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }
