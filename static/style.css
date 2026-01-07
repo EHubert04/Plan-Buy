@@ -92,5 +92,5 @@ li.dragging {
   background-color: #e0f2fe;
 }
 
-.project-nav li:hover { background: #334155; border: none }
+.project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }

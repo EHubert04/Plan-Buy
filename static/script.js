@@ -43,8 +43,26 @@ function openProject(id) {
     document.getElementById('project-detail').style.display = 'block';
     document.getElementById('detail-title').innerText = project.name;
 
-    document.getElementById('todo-list').innerHTML = project.todos.map(i => `<li>${i}</li>`).join('');
-    document.getElementById('res-list').innerHTML = project.resources.map(i => `<li>${i}</li>`).join('');
+   document.getElementById('todo-list').innerHTML =
+    project.todos.map((task, index) => `
+      <li>
+        <label>
+          <input type="checkbox" class="todo-checkbox" data-index="${index}">
+          <span class="todo-text">${task}</span>
+        </label>
+      </li>
+    `).join('');
+
+    document.getElementById('res-list').innerHTML =
+    project.resources.map((res, index) => `
+      <li>
+        <label>
+          <input type="checkbox" class="res-checkbox" data-index="${index}">
+          <span class="res-text">${res}</span>
+        </label>
+      </li>
+    `).join('');
+
 
     initSortableList(document.getElementById('todo-list'));
     initSortableList(document.getElementById('res-list'));
