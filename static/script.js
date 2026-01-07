@@ -63,6 +63,30 @@ function openProject(id) {
       </li>
     `).join('');
 
+    document.querySelectorAll('.todo-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+        const li = e.target.closest('li');
+        if (e.target.checked) {
+            li.classList.add('completed'); // durchgestrichen
+        } else {
+            li.classList.remove('completed');
+        }
+    });
+});
+
+
+    document.querySelectorAll('.res-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+        const li = e.target.closest('li');
+        if (e.target.checked) {
+            li.classList.add('completed'); // durchgestrichen
+        } else {
+            li.classList.remove('completed');
+        }
+    });
+});
+
+
 
     initSortableList(document.getElementById('todo-list'));
     initSortableList(document.getElementById('res-list'));

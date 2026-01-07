@@ -92,5 +92,22 @@ li.dragging {
   background-color: #e0f2fe;
 }
 
+li .todo-checkbox {
+  float: right;          
+  cursor: pointer;
+}
+li.completed .todo-text {
+  text-decoration: line-through;
+  color: #a0a0a0;
+}
+li .res-checkbox {
+  float: right;           
+  cursor: pointer;
+}
+li.completed .res-text {
+  text-decoration: line-through;
+  color: #a0a0a0;
+}
+
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }
