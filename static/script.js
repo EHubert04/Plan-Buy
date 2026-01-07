@@ -55,14 +55,12 @@ function openProject(id) {
 
     document.getElementById('res-list').innerHTML =
     project.resources.map((res, index) => `
-      <li>
-        <label>
-          <input type="checkbox" class="res-checkbox" data-index="${index}">
-          <input type="number" class="res-quantity" min="1" value="${res.quantity}" data-index="${index}">
-          <span class="res-text">${res}</span>
-        </label>
-      </li>
-    `).join('');
+    <li>
+      <span class="res-text">${res.name}</span>
+      <input type="number" class="res-quantity" value="${res.quantity}" min="1" data-index="${index}">
+      <input type="checkbox" class="res-checkbox" data-index="${index}">
+    </li>
+  `).join('');
 
     document.querySelectorAll('.todo-checkbox').forEach(checkbox => {
     checkbox.addEventListener('change', (e) => {
