@@ -63,7 +63,7 @@ def health_db():
         db_url = db_url.replace("postgres://", "postgresql://", 1)
 
     try:
-        conn = psycopg2.connect(db_url, connect_timeout=5)
+        conn = psycopg2.connect(db_url, connect_timeout=30)
         cur = conn.cursor()
         cur.execute("SELECT 1;")
         cur.fetchone()
