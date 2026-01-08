@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, jsonify
+import os
+import psycopg2
 
 app = Flask(__name__)
 
@@ -49,6 +51,27 @@ def add_item(p_id):
                 "name": data['content'],
                 "quantity": quantity})
         return jsonify(project)
+
+@app.get("/health/db")
+def health_db():
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        return {"ok": False, "error": "DATABASE_URL is not set"}, 500
+
+    # Manche Setups nutzen "postgres://"
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    try:
+        conn = psycopg2.connect(db_url, connect_timeout=5)
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        cur.fetchone()
+        cur.close()
+        conn.close()
+        return {"ok": True, "db": "reachable"}, 200
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 500
 
 if __name__ == '__main__':
     app.run(debug=True)
