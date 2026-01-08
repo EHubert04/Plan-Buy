@@ -51,6 +51,10 @@ def add_item(p_id):
                 "name": data['content'],
                 "quantity": quantity})
         return jsonify(project)
+    
+    @app.get("/health/app")
+def health_app():
+    return {"ok": True}, 200
 
 @app.get("/health/db")
 def health_db():
