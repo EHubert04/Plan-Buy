@@ -31,23 +31,28 @@ def fetch_project(sb: Client, project_id: int):
         return None
     project = rows[0]
 
-    # 2) Todos
-    t_res = sb.table("todos").select("content").eq("project_id", project_id).execute()
+    # 2) Todos (inkl. done + id)
+    t_res = sb.table("todos").select("id,content,done").eq("project_id", project_id).order("id").execute()
     if _error(t_res):
         raise RuntimeError(str(_error(t_res)))
-    todos = [r["content"] for r in (_data(t_res) or [])]
+    todos = _data(t_res) or []
 
-    # 3) Resources
-    r_res = sb.table("resources").select("name,quantity").eq("project_id", project_id).execute()
+    # 3) Resources (inkl. purchased + id)
+    r_res = sb.table("resources").select("id,name,quantity,purchased").eq("project_id", project_id).order("id").execute()
     if _error(r_res):
         raise RuntimeError(str(_error(r_res)))
     resources = _data(r_res) or []
 
+    # Defaults, falls quantity null ist
+    for r in resources:
+        if r.get("quantity") is None:
+            r["quantity"] = 1
+
     return {
         "id": project["id"],
         "name": project["name"],
-        "todos": todos,
-        "resources": resources
+        "todos": todos,         # jetzt Objekte!
+        "resources": resources  # jetzt Objekte inkl. purchased
     }
 
 def fetch_all_projects(sb: Client):
@@ -55,32 +60,36 @@ def fetch_all_projects(sb: Client):
     if _error(p_res):
         raise RuntimeError(str(_error(p_res)))
     projects = _data(p_res) or []
-
     if not projects:
         return []
 
     ids = [p["id"] for p in projects]
 
-    t_res = sb.table("todos").select("project_id,content").in_("project_id", ids).execute()
+    t_res = sb.table("todos").select("project_id,id,content,done").in_("project_id", ids).execute()
     if _error(t_res):
         raise RuntimeError(str(_error(t_res)))
     todos_rows = _data(t_res) or []
 
-    r_res = sb.table("resources").select("project_id,name,quantity").in_("project_id", ids).execute()
+    r_res = sb.table("resources").select("project_id,id,name,quantity,purchased").in_("project_id", ids).execute()
     if _error(r_res):
         raise RuntimeError(str(_error(r_res)))
     resources_rows = _data(r_res) or []
 
-    # Map by project_id
     todos_by_pid = {}
     for row in todos_rows:
-        todos_by_pid.setdefault(row["project_id"], []).append(row["content"])
+        todos_by_pid.setdefault(row["project_id"], []).append({
+            "id": row["id"],
+            "content": row["content"],
+            "done": row.get("done", False)
+        })
 
     resources_by_pid = {}
     for row in resources_rows:
         resources_by_pid.setdefault(row["project_id"], []).append({
+            "id": row["id"],
             "name": row["name"],
-            "quantity": row.get("quantity", 1)
+            "quantity": row.get("quantity") if row.get("quantity") is not None else 1,
+            "purchased": row.get("purchased", False)
         })
 
     result = []
@@ -167,7 +176,7 @@ def add_item(p_id):
             return jsonify({"error": f"project {p_id} not found"}), 404
 
         if item_type == "todo":
-            res = sb.table("todos").insert({"project_id": p_id, "content": content}).execute()
+            res = sb.table("todos").insert({"project_id": p_id, "content": content,"done":False}).execute()
         else:
             quantity = data.get("quantity", 1)
             # quantity robust machen
@@ -178,7 +187,7 @@ def add_item(p_id):
             if quantity < 1:
                 quantity = 1
 
-            res = sb.table("resources").insert({"project_id": p_id, "name": content, "quantity": quantity}).execute()
+            res = sb.table("resources").insert({"project_id": p_id, "name": content, "quantity": quantity,"purchased":False}).execute()
 
         if _error(res):
             return jsonify({"error": str(_error(res))}), 500
@@ -187,6 +196,66 @@ def add_item(p_id):
         updated = fetch_project(sb, p_id)
         return jsonify(updated)
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@app.route("/api/projects/<int:p_id>/todos/<int:todo_id>", methods=["PATCH"])
+def update_todo(p_id, todo_id):
+    try:
+        sb = get_supabase()
+        data = request.get_json(force=True)
+
+        if "done" not in data:
+            return jsonify({"error": "missing 'done'"}), 400
+
+        done = bool(data["done"])
+
+        res = sb.table("todos") \
+            .update({"done": done}) \
+            .eq("id", todo_id) \
+            .eq("project_id", p_id) \
+            .execute()
+
+        if _error(res):
+            return jsonify({"error": str(_error(res))}), 500
+
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/projects/<int:p_id>/resources/<int:res_id>", methods=["PATCH"])
+def update_resource(p_id, res_id):
+    try:
+        sb = get_supabase()
+        data = request.get_json(force=True)
+
+        patch = {}
+
+        if "purchased" in data:
+            patch["purchased"] = bool(data["purchased"])
+
+        if "quantity" in data:
+            try:
+                q = int(data["quantity"])
+            except Exception:
+                return jsonify({"error": "quantity must be an integer"}), 400
+            if q < 1:
+                q = 1
+            patch["quantity"] = q
+
+        if not patch:
+            return jsonify({"error": "nothing to update"}), 400
+
+        res = sb.table("resources") \
+            .update(patch) \
+            .eq("id", res_id) \
+            .eq("project_id", p_id) \
+            .execute()
+
+        if _error(res):
+            return jsonify({"error": str(_error(res))}), 500
+
+        return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
