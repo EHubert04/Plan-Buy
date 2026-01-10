@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import os
 from supabase import create_client, Client
+from flask import Flask, render_template, request, jsonify, abort
+from werkzeug.exceptions import HTTPException
 
 app = Flask(__name__)
 
@@ -8,12 +10,61 @@ app = Flask(__name__)
 # Supabase Client Helpers
 # -------------------------
 
-def get_supabase() -> Client:
+def ensure_project_owned(sb: Client, project_id: int, user_id: str) -> bool:
+    """
+    True, wenn projects.id = project_id UND projects.user_id = user_id
+    """
+    res = (
+        sb.table("projects")
+          .select("id")
+          .eq("id", project_id)
+          .eq("user_id", user_id)
+          .limit(1)
+          .execute()
+    )
+    if _error(res):
+        raise RuntimeError(str(_error(res)))
+    return bool(_data(res) or [])
+
+def get_supabase_admin() -> Client:
     url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")  # Backend-only secret!
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")  # secret key (server only)
     if not url or not key:
         raise RuntimeError("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set")
     return create_client(url, key)
+
+def get_supabase_public() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_PUBLISHABLE_KEY")  # publishable key
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY not set")
+    return create_client(url, key)
+
+def require_user_id() -> str:
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        abort(401)
+
+    jwt = auth_header.split(" ", 1)[1].strip()
+    if not jwt:
+        abort(401)
+
+    try:
+        sb_public = get_supabase_public()
+        resp = sb_public.auth.get_user(jwt)  # validiert JWT serverseitig :contentReference[oaicite:5]{index=5}
+
+        # supabase-py Response kann je nach Version etwas variieren -> robust auslesen
+        user = getattr(resp, "user", None)
+        if user and getattr(user, "id", None):
+            return user.id
+
+        d = resp.model_dump() if hasattr(resp, "model_dump") else (resp.dict() if hasattr(resp, "dict") else {})
+        uid = (d.get("user") or {}).get("id")
+        if not uid:
+            abort(401)
+        return uid
+    except Exception:
+        abort(401)
 
 def _data(res):
     return getattr(res, "data", None)
@@ -21,9 +72,8 @@ def _data(res):
 def _error(res):
     return getattr(res, "error", None)
 
-def fetch_project(sb: Client, project_id: int):
-    # 1) Project
-    p_res = sb.table("projects").select("id,name").eq("id", project_id).limit(1).execute()
+def fetch_all_projects(sb: Client, user_id: str):
+    p_res = sb.table("projects").select("id,name").eq("user_id", user_id).order("id").execute()
     if _error(p_res):
         raise RuntimeError(str(_error(p_res)))
     rows = _data(p_res) or []
@@ -109,7 +159,12 @@ def fetch_all_projects(sb: Client):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template(
+        "index.html",
+        supabase_url=os.environ.get("SUPABASE_URL", ""),
+        supabase_key=os.environ.get("SUPABASE_PUBLISHABLE_KEY", ""),
+    )
+
 
 @app.get("/health/app")
 def health_app():
@@ -131,8 +186,9 @@ def health_db():
 @app.route("/api/projects", methods=["GET"])
 def get_projects():
     try:
-        sb = get_supabase()
-        return jsonify(fetch_all_projects(sb))
+        user_id = require_user_id()
+        sb = get_supabase_admin()
+        return jsonify(fetch_all_projects(sb, user_id))
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -140,13 +196,14 @@ def get_projects():
 @app.route("/api/projects", methods=["POST"])
 def add_project():
     try:
-        sb = get_supabase()
+        user_id = require_user_id()
+        sb = get_supabase_admin()
         data = request.get_json(force=True)
         name = (data.get("name") or "").strip()
         if not name:
             return jsonify({"error": "name is required"}), 400
 
-        ins = sb.table("projects").insert({"name": name}).execute()
+        ins = sb.table("projects").insert({"name": name, "user_id": user_id}).execute()
         if _error(ins):
             return jsonify({"error": str(_error(ins))}), 500
 
@@ -159,9 +216,19 @@ def add_project():
 @app.route("/api/projects/<int:p_id>/items", methods=["POST"])
 def add_item(p_id):
     try:
-        sb = get_supabase()
-        data = request.get_json(force=True)
+        # Auth
+        try:
+            user_id = require_user_id()
+        except HTTPException:
+            return jsonify({"error": "unauthorized"}), 401
 
+        sb = get_supabase_admin()
+
+        # Ownership
+        if not ensure_project_owned(sb, p_id, user_id):
+            return jsonify({"error": f"project {p_id} not found"}), 404
+
+        data = request.get_json(force=True)
         item_type = data.get("type")  # "todo" oder "resource"
         content = (data.get("content") or "").strip()
 
@@ -170,16 +237,14 @@ def add_item(p_id):
         if not content:
             return jsonify({"error": "content is required"}), 400
 
-        # Check project exists
-        existing = fetch_project(sb, p_id)
-        if not existing:
-            return jsonify({"error": f"project {p_id} not found"}), 404
-
         if item_type == "todo":
-            res = sb.table("todos").insert({"project_id": p_id, "content": content,"done":False}).execute()
+            res = sb.table("todos").insert({
+                "project_id": p_id,
+                "content": content,
+                "done": False
+            }).execute()
         else:
             quantity = data.get("quantity", 1)
-            # quantity robust machen
             try:
                 quantity = int(quantity)
             except Exception:
@@ -187,48 +252,78 @@ def add_item(p_id):
             if quantity < 1:
                 quantity = 1
 
-            res = sb.table("resources").insert({"project_id": p_id, "name": content, "quantity": quantity,"purchased":False}).execute()
+            res = sb.table("resources").insert({
+                "project_id": p_id,
+                "name": content,
+                "quantity": quantity,
+                "purchased": False
+            }).execute()
 
         if _error(res):
             return jsonify({"error": str(_error(res))}), 500
 
-        # Return updated project
+        # Optional: updated project zurückgeben (praktisch fürs UI)
         updated = fetch_project(sb, p_id)
         return jsonify(updated)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
 @app.route("/api/projects/<int:p_id>/todos/<int:todo_id>", methods=["PATCH"])
 def update_todo(p_id, todo_id):
     try:
-        sb = get_supabase()
-        data = request.get_json(force=True)
+        # Auth
+        try:
+            user_id = require_user_id()
+        except HTTPException:
+            return jsonify({"error": "unauthorized"}), 401
 
+        sb = get_supabase_admin()
+
+        # Ownership
+        if not ensure_project_owned(sb, p_id, user_id):
+            return jsonify({"error": f"project {p_id} not found"}), 404
+
+        data = request.get_json(force=True)
         if "done" not in data:
             return jsonify({"error": "missing 'done'"}), 400
 
         done = bool(data["done"])
 
-        res = sb.table("todos") \
-            .update({"done": done}) \
-            .eq("id", todo_id) \
-            .eq("project_id", p_id) \
-            .execute()
+        res = (
+            sb.table("todos")
+              .update({"done": done})
+              .eq("id", todo_id)
+              .eq("project_id", p_id)
+              .execute()
+        )
 
         if _error(res):
             return jsonify({"error": str(_error(res))}), 500
 
         return jsonify({"status": "success"})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/api/projects/<int:p_id>/resources/<int:res_id>", methods=["PATCH"])
 def update_resource(p_id, res_id):
     try:
-        sb = get_supabase()
-        data = request.get_json(force=True)
+        # Auth
+        try:
+            user_id = require_user_id()
+        except HTTPException:
+            return jsonify({"error": "unauthorized"}), 401
 
+        sb = get_supabase_admin()
+
+        # Ownership
+        if not ensure_project_owned(sb, p_id, user_id):
+            return jsonify({"error": f"project {p_id} not found"}), 404
+
+        data = request.get_json(force=True)
         patch = {}
 
         if "purchased" in data:
@@ -246,16 +341,19 @@ def update_resource(p_id, res_id):
         if not patch:
             return jsonify({"error": "nothing to update"}), 400
 
-        res = sb.table("resources") \
-            .update(patch) \
-            .eq("id", res_id) \
-            .eq("project_id", p_id) \
-            .execute()
+        res = (
+            sb.table("resources")
+              .update(patch)
+              .eq("id", res_id)
+              .eq("project_id", p_id)
+              .execute()
+        )
 
         if _error(res):
             return jsonify({"error": str(_error(res))}), 500
 
         return jsonify({"status": "success"})
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

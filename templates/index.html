@@ -1,11 +1,28 @@
 <!DOCTYPE html>
 <html lang="de">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  window.SUPABASE_URL = "{{ supabase_url }}";
+  window.SUPABASE_KEY = "{{ supabase_key }}";
+</script>
+
 <head>
     <meta charset="UTF-8">
     <title>Plan & Buy</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <div id="auth-overlay" style="display:none;">
+        <div class="auth-card">
+            <h2>Login</h2>
+            <input id="auth-email" type="email" placeholder="E-Mail">
+            <input id="auth-password" type="password" placeholder="Passwort">
+            <button onclick="signIn()">Anmelden</button>
+            <button onclick="signUp()">Account erstellen</button>
+            <p id="auth-msg"></p>
+        </div>
+    </div>
+
     <nav class="sidebar">
         <h2>Plan & Buy</h2>
         <ul id="side-nav" class="project-nav"></ul>

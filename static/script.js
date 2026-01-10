@@ -1,8 +1,69 @@
 let currentProjectId = null;
 let allProjects = [];
+let supabaseClient = null;
+let accessToken = null;
+
+function setAuthUI(loggedIn) {
+  document.getElementById('auth-overlay').style.display = loggedIn ? 'none' : 'block';
+  document.querySelector('.sidebar').style.display = loggedIn ? 'block' : 'none';
+  document.querySelector('.content').style.display = loggedIn ? 'block' : 'none';
+}
+
+async function apiFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (!headers['Content-Type'] && options.method && options.method !== 'GET') {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  return fetch(url, { ...options, headers });
+}
+
+async function initAuth() {
+  supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY); // :contentReference[oaicite:9]{index=9}
+
+  const { data } = await supabaseClient.auth.getSession(); // 
+  accessToken = data?.session?.access_token ?? null;
+
+  setAuthUI(!!accessToken);
+  if (accessToken) loadData();
+
+  supabaseClient.auth.onAuthStateChange((_event, session) => {
+    accessToken = session?.access_token ?? null;
+    setAuthUI(!!accessToken);
+    if (accessToken) loadData();
+  });
+}
+
+async function signUp() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const msg = document.getElementById('auth-msg');
+
+  const { error, data } = await supabaseClient.auth.signUp({ email, password }); // :contentReference[oaicite:11]{index=11}
+  if (error) { msg.textContent = error.message; return; }
+
+  // je nach Supabase Setting kann Email-Confirm aktiv sein
+  msg.textContent = data?.session ? "Account erstellt & eingeloggt." : "Account erstellt. Bitte E-Mail bestätigen (falls aktiviert).";
+}
+
+async function signIn() {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const msg = document.getElementById('auth-msg');
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password }); // :contentReference[oaicite:12]{index=12}
+  if (error) { msg.textContent = error.message; return; }
+  msg.textContent = "";
+}
+
+async function signOut() {
+  await supabaseClient.auth.signOut();
+}
 
 async function loadData() {
-    const res = await fetch('/api/projects');
+    const res = await apiFetch('/api/projects');
     allProjects = await res.json();
     renderUI();
 }
@@ -27,11 +88,7 @@ function renderUI() {
 async function addProject() {
     const name = prompt("Projektname:");
     if (!name) return;
-    await fetch('/api/projects', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name})
-    });
+    await apiFetch('/api/projects', { method:'POST', body: JSON.stringify({name}) });
     loadData();
 }
 
@@ -86,7 +143,7 @@ function openProject(id) {
       const li = e.target.closest('li');
       li.classList.toggle('completed', done);
 
-      const resp = await fetch(`/api/projects/${currentProjectId}/todos/${todoId}`, {
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/todos/${todoId}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ done })
@@ -113,7 +170,7 @@ function openProject(id) {
       const li = e.target.closest('li');
       li.classList.toggle('completed', purchased);
 
-      const resp = await fetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ purchased })
@@ -139,7 +196,7 @@ function openProject(id) {
       if (!Number.isFinite(quantity) || quantity < 1) quantity = 1;
       e.target.value = quantity;
 
-      const resp = await fetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ quantity })
@@ -161,11 +218,10 @@ async function saveItem(type) {
     const content = input.value;
     if (!content) return;
 
-    await fetch(`/api/projects/${currentProjectId}/items`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({type, content})
-    });
+    await apiFetch(`/api/projects/${currentProjectId}/items`, {
+  method:'POST',
+  body: JSON.stringify({type, content})
+});
 
     input.value = '';
     loadData().then(() => openProject(currentProjectId));
@@ -230,4 +286,4 @@ function getDragAfterElement(container, y) {
 
 
 
-loadData();
+initAuth();
