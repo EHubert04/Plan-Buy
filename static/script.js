@@ -121,7 +121,10 @@ function openProject(id) {
   document.getElementById('res-list').innerHTML =
     project.resources.map((res) => `
       <li class="${res.purchased ? 'completed' : ''}">
-        <span class="res-text">${res.name}</span>
+        <span class="res-text">
+          ${res.name}
+          ${res.category ? `<small style="color: #64748b; font-size: 0.85em; margin-left: 8px;">(${res.category})</small>` : ''}
+        </span>
         <input type="number"
                class="res-quantity"
                value="${res.quantity ?? 1}"

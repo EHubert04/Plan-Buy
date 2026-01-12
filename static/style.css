@@ -116,5 +116,9 @@ li.completed .res-text {
 .res-quanity{
   width: 25px;
 }
+.res-text small {
+    font-style: italic;
+    opacity: 0.8;
+}
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }

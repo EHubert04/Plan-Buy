@@ -3,6 +3,7 @@ import os
 from supabase import create_client, Client
 from flask import Flask, render_template, request, jsonify, abort
 from werkzeug.exceptions import HTTPException
+from categorizer import get_category_for_item
 
 app = Flask(__name__)
 
@@ -88,7 +89,7 @@ def fetch_all_projects(sb: Client, user_id: str):
     todos = _data(t_res) or []
 
     # 3) Resources (inkl. purchased + id)
-    r_res = sb.table("resources").select("id,name,quantity,purchased").eq("project_id", project_id).order("id").execute()
+    r_res = sb.table("resources").select("id,name,quantity,purchased,category").eq("project_id", project_id).order("id").execute()
     if _error(r_res):
         raise RuntimeError(str(_error(r_res)))
     resources = _data(r_res) or []
@@ -244,6 +245,7 @@ def add_item(p_id):
                 "done": False
             }).execute()
         else:
+            assigned_category = get_category_for_item(content)
             quantity = data.get("quantity", 1)
             try:
                 quantity = int(quantity)
@@ -256,6 +258,7 @@ def add_item(p_id):
                 "project_id": p_id,
                 "name": content,
                 "quantity": quantity,
+                "category": assigned_category,
                 "purchased": False
             }).execute()
 
