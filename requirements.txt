@@ -1,5 +1,3 @@
 Flask
 gunicorn
 supabase
-sentence-transformers
-torch

@@ -1,6 +1,4 @@
-# categorizer.py
-from sentence_transformers import SentenceTransformer, util
-import torch
+
 
 
 model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
