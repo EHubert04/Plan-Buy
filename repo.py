@@ -84,7 +84,11 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
         raise RuntimeError(str(error(r_res)))
     resources_rows = data(r_res) or []
 
-    _attach_category_names(sb, resources_rows)
+    try:
+        _attach_category_names(sb, resources_rows)
+    except Exception:
+        for r in resources_rows:
+            r["category"] = None
 
     todos_by_pid: Dict[int, List[Dict]] = {}
     for row in todos_rows:
@@ -135,7 +139,11 @@ def fetch_project_for_user(sb: Client, project_id: int, user_id: str) -> Optiona
     if error(r_res):
         raise RuntimeError(str(error(r_res)))
     resources = data(r_res) or []
-    _attach_category_names(sb, resources)
+    try:
+        _attach_category_names(sb, resources_rows)
+    except Exception:
+        for r in resources_rows:
+            r["category"] = None
 
     for r in resources:
         if r.get("quantity") is None:
@@ -160,18 +168,27 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         res = sb.table("todos").insert({"project_id": project_id, "content": content, "done": False}).execute()
         if error(res):
             raise RuntimeError(str(error(res)))
-    else:
-        cat_name = get_category_for_item(content)
-        cat_id = get_or_create_category_id(sb, project_id, cat_name)
-        res = sb.table("resources").insert({
-            "project_id": project_id,
-            "name": content,
-            "quantity": quantity,
-            "purchased": False,
-            "category_id": cat_id,
-        }).execute()
-        if error(res):
-            raise RuntimeError(str(error(res)))
+        else:
+            # Kategorie optional: wenn Kategorie-Logik fehlschlägt, speichern wir trotzdem die Resource
+            cat_id = None
+            try:
+                cat_name = get_category_for_item(content)
+                cat_id = get_or_create_category_id(sb, project_id, cat_name)
+            except Exception:
+                cat_id = None
+
+            payload = {
+                "project_id": project_id,
+                "name": content,
+                "quantity": quantity,
+                "purchased": False,
+            }
+            if cat_id is not None:
+                payload["category_id"] = cat_id
+
+            res = sb.table("resources").insert(payload).execute()
+            if error(res):
+                raise RuntimeError(str(error(res)))
 
     return fetch_project_for_user(sb, project_id, user_id)
 
