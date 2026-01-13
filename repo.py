@@ -173,7 +173,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         # Kategorie optional: wenn Kategorie-Logik fehlschlägt, speichern wir trotzdem die Resource
         cat_id = None
         try:
-            cat_name = get_category_for_item(content)
+            cat_name = get_category_for_item(sb, content)
             cat_id = get_or_create_category_id(sb, project_id, cat_name)
         except Exception:
             cat_id = None
