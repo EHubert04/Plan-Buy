@@ -82,12 +82,11 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
     r_res = sb.table("resources").select("project_id,id,name,quantity,purchased,category_id").in_("project_id", ids).execute()
     if error(r_res):
         raise RuntimeError(str(error(r_res)))
-    resources_rows = data(r_res) or []
-
+    resources = data(r_res) or []
     try:
-        _attach_category_names(sb, resources_rows)
+        _attach_category_names(sb, resources)
     except Exception:
-        for r in resources_rows:
+        for r in resources:
             r["category"] = None
 
     todos_by_pid: Dict[int, List[Dict]] = {}
