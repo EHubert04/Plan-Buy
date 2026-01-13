@@ -164,17 +164,20 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         return None
 
     if item_type == "todo":
+        # Logik für Aufgaben
         res = sb.table("todos").insert({"project_id": project_id, "content": content, "done": False}).execute()
         if error(res):
             raise RuntimeError(str(error(res)))
-
-    else:
-        # Kategorie optional: wenn Kategorie-Logik fehlschlägt, speichern wir trotzdem die Resource
+            
+    elif item_type == "resource":
+        # Logik für Einkaufsliste (Resources)
         cat_id = None
         try:
-            cat_name = get_category_for_item(content)
+            # Jetzt wird 'sb' korrekt mitgegeben
+            cat_name = get_category_for_item(sb, content)
             cat_id = get_or_create_category_id(sb, project_id, cat_name)
-        except Exception:
+        except Exception as e:
+            print(f"Kategorisierung fehlgeschlagen: {e}")
             cat_id = None
 
         payload = {
@@ -190,6 +193,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         if error(res):
             raise RuntimeError(str(error(res)))
 
+    # Projektdaten neu laden und zurückgeben
     return fetch_project_for_user(sb, project_id, user_id)
 
 
