@@ -3,6 +3,11 @@ from supabase import Client
 from supabase_utils import data, error
 from categorizer import get_category_for_item
 
+def _pid(v):
+    try:
+        return int(v)
+    except Exception:
+        return v
 
 def ensure_project_owned(sb: Client, project_id: int, user_id: str) -> bool:
     res = (
@@ -83,28 +88,30 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
 
     todos_by_pid: Dict[int, List[Dict]] = {}
     for row in todos_rows:
-        todos_by_pid.setdefault(row["project_id"], []).append({
+        pid = _pid(row["project_id"])
+        todos_by_pid.setdefault(pid, []).append({
             "id": row["id"],
             "content": row["content"],
             "done": row.get("done", False),
-        })
+    })
 
     resources_by_pid: Dict[int, List[Dict]] = {}
     for row in resources_rows:
-        resources_by_pid.setdefault(row["project_id"], []).append({
+        pid = _pid(row["project_id"])
+        resources_by_pid.setdefault(pid, []).append({
             "id": row["id"],
             "name": row["name"],
             "quantity": row.get("quantity") if row.get("quantity") is not None else 1,
             "purchased": row.get("purchased", False),
             "category": row.get("category"),
-        })
+    })
 
     return [{
         "id": p["id"],
         "name": p["name"],
-        "todos": todos_by_pid.get(p["id"], []),
-        "resources": resources_by_pid.get(p["id"], []),
-    } for p in projects]
+        "todos": todos_by_pid.get(_pid(p["id"]), []),
+        "resources": resources_by_pid.get(_pid(p["id"]), []),
+} for p in projects]
 
 
 def fetch_project_for_user(sb: Client, project_id: int, user_id: str) -> Optional[Dict]:

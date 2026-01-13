@@ -218,17 +218,33 @@ function openProject(id) {
 }
 
 async function saveItem(type) {
-    const input = document.getElementById(type === 'todo' ? 'todo-input' : 'res-input');
-    const content = input.value;
-    if (!content) return;
+  const input = document.getElementById(type === 'todo' ? 'todo-input' : 'res-input');
+  const content = (input.value || '').trim();
+  if (!content) return;
 
-    await apiFetch(`/api/projects/${currentProjectId}/items`, {
-  method:'POST',
-  body: JSON.stringify({type, content})
-});
+  const resp = await apiFetch(`/api/projects/${currentProjectId}/items`, {
+    method: 'POST',
+    body: JSON.stringify({ type, content })
+  });
 
-    input.value = '';
-    loadData().then(() => openProject(currentProjectId));
+  if (!resp.ok) {
+    console.error(await resp.text());
+    alert("Fehler beim Speichern.");
+    return;
+  }
+
+  const updatedProject = await resp.json();
+
+  // Local state aktualisieren
+  const idx = allProjects.findIndex(p => String(p.id) === String(updatedProject.id));
+  if (idx >= 0) allProjects[idx] = updatedProject;
+  else allProjects.push(updatedProject);
+
+  input.value = '';
+
+  // UI neu rendern + Projekt neu öffnen (zeigt sofort Ressourcen)
+  renderUI();
+  openProject(updatedProject.id);
 }
 
 function showDashboard() {
