@@ -99,7 +99,7 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
     })
 
     resources_by_pid: Dict[int, List[Dict]] = {}
-    for row in resources_rows:
+    for row in resources:
         pid = _pid(row["project_id"])
         resources_by_pid.setdefault(pid, []).append({
             "id": row["id"],
