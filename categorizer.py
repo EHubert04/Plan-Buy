@@ -1,6 +1,6 @@
 
 
-
+""""
 model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
 
 CATEGORIES = [
@@ -18,9 +18,7 @@ CATEGORIES = [
 CATEGORY_EMBEDDINGS = model.encode(CATEGORIES, convert_to_tensor=True)
 
 def get_category_for_item(sb, name):
-    """
-    Prüft erst den DB-Cache und nutzt bei Miss den Sentence Transformer.
-    """
+    
     if not name:
         return "Sonstiges"
     
@@ -49,7 +47,7 @@ def get_category_for_item(sb, name):
     return category
 
 def _predict_with_transformers(item_name):
-    """Berechnet die Ähnlichkeit des Artikels zu allen Kategorien."""
+    
     # Embedding für den eingegebenen Artikel erstellen
     item_embedding = model.encode(item_name, convert_to_tensor=True)
     
@@ -64,3 +62,4 @@ def _predict_with_transformers(item_name):
         return "Sonstiges"
         
     return CATEGORIES[best_idx]
+"""
