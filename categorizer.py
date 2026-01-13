@@ -1,58 +1,68 @@
-from sentence_transformers import SentenceTransformer
-import numpy as np
+# categorizer.py
+from sentence_transformers import SentenceTransformer, util
+import torch
 
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
-supabase.table("ressource_categories").update({
-    "embedding": embed_category(cat)
-}).eq("id", cat["id"]).execute()
+model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
 
-def keyword_match(name, categories):
-    name = name.lower().strip()
+CATEGORIES = [
+    "Obst & Gemüse", 
+    "Milchprodukte", 
+    "Getränke", 
+    "Backwaren", 
+    "Fleisch & Fisch", 
+    "Vorrat", 
+    "Hygiene", 
+    "Sonstiges"
+]
 
-    for cat in categories:
-        examples = [k.strip().lower() for k in cat["keywords"].split(",")]
-        if name in examples:
-            return cat["name"]
+# Vorberechnen der Embeddings für die Kategorien (spart Zeit bei jeder Anfrage)
+CATEGORY_EMBEDDINGS = model.encode(CATEGORIES, convert_to_tensor=True)
 
-    return None
-
-def embed_category(category):
-    text = f"{category['name']} {category['keywords']}"
-    emb = model.encode(text)
-    return emb.tolist()
-
-def load_categories():
-    return supabase.table("ressource_categories").select("*").execute().data
-def get_category_for_item(name, categories):
+def get_category_for_item(sb, name):
+    """
+    Prüft erst den DB-Cache und nutzt bei Miss den Sentence Transformer.
+    """
+    if not name:
+        return "Sonstiges"
     
-    name = name.lower()
+    name_clean = name.lower().strip()
 
-    for cat in categories:
-        keywords = cat["keywords"].lower().split(",")
-        if any(k.strip() in name for k in keywords):
-            return cat["name"]
-    return "Sonstiges"
-def cosine(a, b):
-    a = np.array(a)
-    b = np.array(b)
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    # 1. DB-Cache prüfen (exakter Treffer)
+    try:
+        res = sb.table("categorization_cache").select("category").eq("keyword", name_clean).execute()
+        if res.data:
+            return res.data[0]['category']
+    except Exception as e:
+        print(f"Cache-Fehler: {e}")
 
-def classify_item(name):
-    item_emb = model.encode(name)
+    # 2. KI nutzen (Sentence Transformer Fallback)
+    category = _predict_with_transformers(name_clean)
 
-    categories = supabase.table("resource_categories") \
-        .select("name, embedding") \
-        .execute().data
+    # 3. Ergebnis im Cache speichern für das nächste Mal
+    try:
+        sb.table("categorization_cache").insert({
+            "keyword": name_clean, 
+            "category": category
+        }).execute()
+    except Exception:
+        pass 
 
-    best = None
-    score = -1
+    return category
 
-    for cat in categories:
-        sim = cosine(item_emb, cat["embedding"])
-        if sim > score:
-            best = cat["name"]
-            score = sim
-        elif similarity < 0.55:
-            return "Sonstige"
-    return best
+def _predict_with_transformers(item_name):
+    """Berechnet die Ähnlichkeit des Artikels zu allen Kategorien."""
+    # Embedding für den eingegebenen Artikel erstellen
+    item_embedding = model.encode(item_name, convert_to_tensor=True)
+    
+    # Kosinus-Ähnlichkeit zu allen Kategorie-Embeddings berechnen
+    cosine_scores = util.cos_sim(item_embedding, CATEGORY_EMBEDDINGS)[0]
+    
+    # Den Index mit der höchsten Ähnlichkeit finden
+    best_idx = torch.argmax(cosine_scores).item()
+    
+    # Optional: Ein Schwellenwert (z.B. 0.35). Wenn die Ähnlichkeit zu gering ist -> Sonstiges
+    if cosine_scores[best_idx] < 0.35:
+        return "Sonstiges"
+        
+    return CATEGORIES[best_idx]
