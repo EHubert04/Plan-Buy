@@ -63,9 +63,10 @@ async function signOut() {
 }
 
 async function loadData() {
-    const res = await apiFetch('/api/projects');
-    allProjects = await res.json();
-    renderUI();
+  const res = await apiFetch('/api/projects');
+  if (!res.ok) { console.error(await res.text()); return; }
+  allProjects = await res.json();
+  renderUI();
 }
 
 function renderUI() {
