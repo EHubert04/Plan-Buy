@@ -1,6 +1,7 @@
 from typing import Dict, List, Optional
 from supabase import Client
 from supabase_utils import data, error
+# WICHTIG: Hier importieren wir jetzt die NEUE Funktion
 from categorizer import get_category_id_for_item
 
 def _pid(v):
@@ -22,34 +23,12 @@ def ensure_project_owned(sb: Client, project_id: int, user_id: str) -> bool:
         raise RuntimeError(str(error(res)))
     return bool(data(res) or [])
 
-
+# Diese Funktion wird nur noch intern gebraucht, falls wir sie später nutzen wollen.
+# Für Items nutzen wir jetzt direkt die ID vom Categorizer.
 def get_or_create_category_id(sb: Client, project_id: int, category_name: str) -> Optional[int]:
-    
-    if not category_name:
-        return None
-
-    sel = (
-        sb.table("resource_categories")
-        .select("id")
-        .eq("name", category_name)
-        .limit(1)
-        .execute()
-    )
-    if error(sel):
-        # Fehler (z.B. Verbindungsproblem) nur printen, nicht abstürzen
-        print(f"DB Error lookup category: {error(sel)}")
-        return None
-        
-    rows = data(sel) or []
-    if rows:
-        return rows[0]["id"]
-    
-    # Optional: Fallback auf "Sonstiges" (ID suchen), falls der Name nicht existiert
-    # Wenn "Kekse" kommt, aber nur "Backwaren" existiert, und der Categorizer
-    # "Backwaren" geliefert hat, passt es. Wenn er "Kekse" liefert, finden wir nichts.
-    
+    if not category_name: return None
+    # Alte Logik entfernt -> Wir verlassen uns auf den globalen ID-Check
     return None
-
 
 def _attach_category_names(sb: Client, resources_rows: List[Dict]) -> None:
     cat_ids = sorted({r.get("category_id") for r in resources_rows if r.get("category_id")})
@@ -58,6 +37,7 @@ def _attach_category_names(sb: Client, resources_rows: List[Dict]) -> None:
             r["category"] = None
         return
 
+    # Wir holen die Namen passend zu den IDs aus der DB
     cats = sb.table("resource_categories").select("id,name").in_("id", cat_ids).execute()
     if error(cats):
         raise RuntimeError(str(error(cats)))
@@ -86,11 +66,11 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
     if error(r_res):
         raise RuntimeError(str(error(r_res)))
     resources = data(r_res) or []
+    
     try:
         _attach_category_names(sb, resources)
     except Exception:
-        for r in resources:
-            r["category"] = None
+        pass
 
     todos_by_pid: Dict[int, List[Dict]] = {}
     for row in todos_rows:
@@ -99,7 +79,7 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
             "id": row["id"],
             "content": row["content"],
             "done": row.get("done", False),
-    })
+        })
 
     resources_by_pid: Dict[int, List[Dict]] = {}
     for row in resources:
@@ -109,15 +89,15 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
             "name": row["name"],
             "quantity": row.get("quantity") if row.get("quantity") is not None else 1,
             "purchased": row.get("purchased", False),
-            "category": row.get("category"),
-    })
+            "category": row.get("category"), # Name wurde durch _attach_category_names angefügt
+        })
 
     return [{
         "id": p["id"],
         "name": p["name"],
         "todos": todos_by_pid.get(_pid(p["id"]), []),
         "resources": resources_by_pid.get(_pid(p["id"]), []),
-} for p in projects]
+    } for p in projects]
 
 
 def fetch_project_for_user(sb: Client, project_id: int, user_id: str) -> Optional[Dict]:
@@ -141,15 +121,14 @@ def fetch_project_for_user(sb: Client, project_id: int, user_id: str) -> Optiona
     if error(r_res):
         raise RuntimeError(str(error(r_res)))
     resources = data(r_res) or []
+    
     try:
         _attach_category_names(sb, resources)
     except Exception:
-        for r in resources:
-            r["category"] = None
+        pass
 
     for r in resources:
-        if r.get("quantity") is None:
-            r["quantity"] = 1
+        if r.get("quantity") is None: r["quantity"] = 1
 
     return {"id": project["id"], "name": project["name"], "todos": todos, "resources": resources}
 
@@ -167,20 +146,22 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         return None
 
     if item_type == "todo":
-        # Logik für Aufgaben
         res = sb.table("todos").insert({"project_id": project_id, "content": content, "done": False}).execute()
         if error(res):
             raise RuntimeError(str(error(res)))
 
     else:
-        # Ressource Logik:
+        # --- HIER IST DIE WICHTIGE ÄNDERUNG ---
         cat_id = None
         try:
-            # NEU: Wir bekommen direkt die ID oder None zurück
-            # Import muss oben angepasst sein: from categorizer import get_category_id_for_item
+            # Wir rufen die neue Funktion auf und übergeben 'sb'
+            # Sie gibt direkt eine ID (int) oder None zurück.
             cat_id = get_category_id_for_item(sb, content)
         except Exception as e:
-            print(f"Cat Error: {e}")
+            # HIER DRUCKEN WIR DEN FEHLER IN DIE KONSOLE
+            print(f"!!! KATEGORISIERUNG FEHLGESCHLAGEN: {e}")
+            import traceback
+            traceback.print_exc()
             cat_id = None
 
         payload = {
@@ -190,6 +171,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
             "purchased": False,
         }
         
+        # Wenn wir eine ID bekommen haben, speichern wir sie
         if cat_id is not None:
             payload["category_id"] = cat_id
 
@@ -197,7 +179,6 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         if error(res):
             raise RuntimeError(str(error(res)))
 
-    # Projektdaten neu laden und zurückgeben
     return fetch_project_for_user(sb, project_id, user_id)
 
 
@@ -217,7 +198,7 @@ def update_todo(sb: Client, project_id: int, user_id: str, todo_id: int, done: b
     return bool(data(res))
 
 
-def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purchased: Optional[bool] = None, quantity: Optional[int] = None) -> bool:
+def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purchased: Optional[bool] = None, quantity: Optional[int] = None, category_id: Optional[int] = None) -> bool:
     if not ensure_project_owned(sb, project_id, user_id):
         return False
 
@@ -227,6 +208,8 @@ def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purc
     if quantity is not None:
         q = int(quantity)
         patch["quantity"] = 1 if q < 1 else q
+    if category_id is not None:
+        patch["category_id"] = int(category_id)
 
     if not patch:
         return True
@@ -238,6 +221,23 @@ def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purc
         .eq("project_id", project_id)
         .execute()
     )
+    
+    # Optional: Lernen bei manueller Änderung (siehe vorherige Diskussion)
+    if category_id is not None and data(res):
+        try:
+            item_name = data(res)[0]["name"]
+            # Hole den Namen der neuen Kategorie für den Cache
+            cat_res = sb.table("resource_categories").select("name").eq("id", category_id).single().execute()
+            if data(cat_res):
+                cat_name = data(cat_res)["name"]
+                sb.table("categorization_cache").upsert({
+                    "keyword": item_name.lower().strip(),
+                    "category": cat_name,
+                    "category_id": category_id
+                }).execute()
+        except Exception:
+            pass
+
     if error(res):
         raise RuntimeError(str(error(res)))
     return bool(data(res))
