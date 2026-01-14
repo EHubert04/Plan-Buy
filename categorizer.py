@@ -31,7 +31,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie."
     
     payload = {
-        "model": "HuggingFaceH4/zephyr-7b-beta",
+        "model": "microsoft/Phi-3.5-mini-instruct",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 30, "temperature": 0.1
     }
