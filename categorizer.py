@@ -47,7 +47,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie."
     
     payload = {
-        "model": "meta-llama/Llama-3.2-3B-Instruct",
+        "model": "nousresearch/hermes-3-llama-3.1-8b",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 20, "temperature": 0.1
     }
