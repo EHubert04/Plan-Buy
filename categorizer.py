@@ -1,10 +1,12 @@
 import os
 import requests
-import json
+from supabase_utils import data, error # Falls du diese Helfer hast, sonst direkt data/error zugriff
 
+# Hugging Face Konfiguration (bleibt gleich)
 HF_API_URL = "https://router.huggingface.co/hf-inference/v1/chat/completions"
 HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
 
+# Lokales Mapping (bleibt gleich)
 KEYWORD_MAPPING = {
     "Obst & Gemüse": ["apfel", "banane", "birne", "tomate", "gurke", "salat", "zwiebel", "kartoffel", "paprika", "zitrone"],
     "Milchprodukte": ["milch", "käse", "quark", "joghurt", "butter", "sahne", "kaese"],
@@ -19,26 +21,17 @@ KEYWORD_MAPPING = {
 
 VALID_CATEGORIES = list(KEYWORD_MAPPING.keys()) + ["Sonstiges"]
 
-def get_ai_category(name):
-
-    """Fragt die KI nach einer Kategorie."""
+def get_ai_category_name(name):
+    """Liefert NUR den Namen der Kategorie via KI."""
     if not HF_TOKEN:
-        print("Kein Hugging Face Token.")
-
         return "Sonstiges"
     
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-    prompt = f"Ordne das Produkt '{name}' einer dieser Kategorien zu: {', '.join(VALID_CATEGORIES)}. Antworte NUR mit dem Namen der Kategorie."
-
+    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+    prompt = f"Ordne '{name}' zu: {', '.join(VALID_CATEGORIES)}. Nur Kategorie-Name."
     payload = {
         "model": "meta-llama/Llama-3.2-3B-Instruct",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 15,
-        "temperature": 0.1
+        "max_tokens": 15, "temperature": 0.1
     }
     
     try:
@@ -48,47 +41,58 @@ def get_ai_category(name):
             for cat in VALID_CATEGORIES:
                 if cat.lower() in content.lower():
                     return cat
-        else:
-            print(f"KI Fehler: {response.status_code}")
     except Exception as e:
-        print(f"KI Exception: {e}")
-    
+        print(f"KI Fehler: {e}")
     return "Sonstiges"
 
-def get_category_for_item(sb, name):
-    if not name: return "Sonstiges"
-    name_clean = name.lower().strip()
-    
-    found_category = None
-
-    # 1. Zuerst im Cache schauen (DB)
+def get_category_id_by_name(sb, cat_name):
+    """Hilfsfunktion: Sucht die ID zu einem Namen in der globalen Tabelle."""
     try:
-        res = sb.table("categorization_cache").select("category").eq("keyword", name_clean).execute()
-        if res.data and len(res.data) > 0:
-            return res.data[0]['category'] # Wenn schon in DB, fertig.
+        res = sb.table("resource_categories").select("id").eq("name", cat_name).limit(1).execute()
+        if res.data:
+            return res.data[0]['id']
+    except Exception:
+        pass
+    return None
+
+def get_category_id_for_item(sb, name):
+    """
+    Hauptfunktion: Gibt direkt die ID zurück (oder None).
+    Ablauf: Cache (ID) -> Keywords (Name->ID) -> KI (Name->ID) -> Cache Update
+    """
+    if not name: return None
+    name_clean = name.lower().strip()
+
+    # 1. Cache Check (Hat jetzt direkt die ID!)
+    try:
+        res = sb.table("categorization_cache").select("category_id").eq("keyword", name_clean).execute()
+        if res.data and res.data[0]['category_id']:
+            return res.data[0]['category_id']
     except Exception:
         pass
 
-    # 2. Wenn nicht in DB -> In lokaler Liste suchen
-    if not found_category:
-        for category, keywords in KEYWORD_MAPPING.items():
-            if any(kw in name_clean for kw in keywords):
-                found_category = category
-                break # Gefunden! Aber wir returnen noch nicht, damit wir speichern können.
+    # 2. Name ermitteln (Lokal oder KI)
+    found_name = None
+    for category, keywords in KEYWORD_MAPPING.items():
+        if any(kw in name_clean for kw in keywords):
+            found_name = category
+            break
+    
+    if not found_name:
+        found_name = get_ai_category_name(name)
 
-    # 3. Wenn immer noch nicht gefunden -> KI fragen
-    if not found_category:
-        found_category = get_ai_category(name)
+    # 3. ID zum Namen suchen (Datenbank-Lookup)
+    found_id = get_category_id_by_name(sb, found_name)
 
-    # 4. Ergebnis IMMER in den Cache speichern (Lerneffekt)
-    if found_category and found_category != "Sonstiges":
+    # 4. Im Cache speichern (Jetzt mit ID!)
+    if found_id:
         try:
             sb.table("categorization_cache").upsert({
-                "keyword": name_clean, 
-                "category": found_category
+                "keyword": name_clean,
+                "category": found_name,   # Wir speichern den Namen zur Info trotzdem
+                "category_id": found_id   # Das Wichtige für die Verknüpfung
             }).execute()
-            print(f"Gelernt: {name_clean} -> {found_category}")
-        except Exception as e:
-            print(f"Fehler beim Cache-Speichern: {e}")
+        except Exception:
+            pass
 
-    return found_category if found_category else "Sonstiges"
+    return found_id

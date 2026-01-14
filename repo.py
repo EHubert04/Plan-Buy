@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 from supabase import Client
 from supabase_utils import data, error
-from categorizer import get_category_for_item
+from categorizer import get_category_id_for_item
 
 def _pid(v):
     try:
@@ -173,12 +173,14 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
             raise RuntimeError(str(error(res)))
 
     else:
-        # Kategorie optional: wenn Kategorie-Logik fehlschlägt, speichern wir trotzdem die Resource
+        # Ressource Logik:
         cat_id = None
         try:
-            cat_name = get_category_for_item(sb, content)
-            cat_id = get_or_create_category_id(sb, project_id, cat_name)
-        except Exception:
+            # NEU: Wir bekommen direkt die ID oder None zurück
+            # Import muss oben angepasst sein: from categorizer import get_category_id_for_item
+            cat_id = get_category_id_for_item(sb, content)
+        except Exception as e:
+            print(f"Cat Error: {e}")
             cat_id = None
 
         payload = {
@@ -187,6 +189,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
             "quantity": quantity,
             "purchased": False,
         }
+        
         if cat_id is not None:
             payload["category_id"] = cat_id
 
