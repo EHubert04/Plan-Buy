@@ -99,7 +99,7 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
     })
 
     resources_by_pid: Dict[int, List[Dict]] = {}
-    for row in resources_rows:
+    for row in resources:
         pid = _pid(row["project_id"])
         resources_by_pid.setdefault(pid, []).append({
             "id": row["id"],
@@ -173,7 +173,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         # Kategorie optional: wenn Kategorie-Logik fehlschlägt, speichern wir trotzdem die Resource
         cat_id = None
         try:
-            cat_name = get_category_for_item(content)
+            cat_name = get_category_for_item(sb, content)
             cat_id = get_or_create_category_id(sb, project_id, cat_name)
         except Exception:
             cat_id = None

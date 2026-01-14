@@ -2,7 +2,6 @@ import os
 import requests
 import json
 
-# Hugging Face Konfiguration
 HF_API_URL = "https://router.huggingface.co/hf-inference/v1/chat/completions"
 HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
 
@@ -21,9 +20,11 @@ KEYWORD_MAPPING = {
 VALID_CATEGORIES = list(KEYWORD_MAPPING.keys()) + ["Sonstiges"]
 
 def get_ai_category(name):
+
     """Fragt die KI nach einer Kategorie."""
     if not HF_TOKEN:
         print("Kein Hugging Face Token.")
+
         return "Sonstiges"
     
     headers = {
