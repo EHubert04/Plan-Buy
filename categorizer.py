@@ -31,7 +31,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie."
     
     payload = {
-        "model": "Qwen/Qwen2.5-72B-Instruct",
+        "model": "HuggingFaceH4/zephyr-7b-beta",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 30, "temperature": 0.1
     }
