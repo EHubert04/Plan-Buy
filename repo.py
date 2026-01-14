@@ -3,7 +3,7 @@ from supabase import Client
 from supabase_utils import data, error
 # WICHTIG: Hier importieren wir jetzt die NEUE Funktion
 from categorizer import get_category_id_for_item
-
+import sys
 def _pid(v):
     try:
         return int(v)
@@ -151,19 +151,21 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
             raise RuntimeError(str(error(res)))
 
     else:
-        # --- HIER IST DIE WICHTIGE ÄNDERUNG ---
+        # Ressource Logik:
         cat_id = None
+        
+        # DEBUG: Sag uns, dass du startest! (Benutze stderr, das wird nie verschluckt)
+        sys.stderr.write(f"DEBUG: Starte Kategorisierung für '{content}'...\n")
+        
         try:
-            # Wir rufen die neue Funktion auf und übergeben 'sb'
-            # Sie gibt direkt eine ID (int) oder None zurück.
             cat_id = get_category_id_for_item(sb, content)
+            
+            # DEBUG: Sag uns, was rausgekommen ist!
+            sys.stderr.write(f"DEBUG: Ergebnis für '{content}' -> ID: {cat_id}\n")
+            
         except Exception as e:
-            # HIER DRUCKEN WIR DEN FEHLER IN DIE KONSOLE
-            print(f"!!! KATEGORISIERUNG FEHLGESCHLAGEN: {e}")
-            import traceback
-            traceback.print_exc()
+            sys.stderr.write(f"!!! CRASH FEHLER: {e}\n")
             cat_id = None
-
         payload = {
             "project_id": project_id,
             "name": content,
