@@ -4,7 +4,7 @@ import sys  # <--- WICHTIG: Neu importieren
 
 # Hugging Face Konfiguration
 HF_API_URL = "https://router.huggingface.co/hf-inference/v1/chat/completions"
-HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 def get_db_categories(sb):
     try:
