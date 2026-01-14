@@ -24,28 +24,31 @@ def ensure_project_owned(sb: Client, project_id: int, user_id: str) -> bool:
 
 
 def get_or_create_category_id(sb: Client, project_id: int, category_name: str) -> Optional[int]:
+    
     if not category_name:
         return None
 
     sel = (
         sb.table("resource_categories")
         .select("id")
-        .eq("project_id", project_id)
         .eq("name", category_name)
         .limit(1)
         .execute()
     )
     if error(sel):
-        raise RuntimeError(str(error(sel)))
+        # Fehler (z.B. Verbindungsproblem) nur printen, nicht abstürzen
+        print(f"DB Error lookup category: {error(sel)}")
+        return None
+        
     rows = data(sel) or []
     if rows:
         return rows[0]["id"]
-
-    ins = sb.table("resource_categories").insert({"project_id": project_id, "name": category_name}).execute()
-    if error(ins):
-        raise RuntimeError(str(error(ins)))
-    created = (data(ins) or [None])[0]
-    return created["id"] if created else None
+    
+    # Optional: Fallback auf "Sonstiges" (ID suchen), falls der Name nicht existiert
+    # Wenn "Kekse" kommt, aber nur "Backwaren" existiert, und der Categorizer
+    # "Backwaren" geliefert hat, passt es. Wenn er "Kekse" liefert, finden wir nichts.
+    
+    return None
 
 
 def _attach_category_names(sb: Client, resources_rows: List[Dict]) -> None:
