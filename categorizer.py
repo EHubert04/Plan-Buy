@@ -3,11 +3,12 @@ import requests
 import sys
 import json
 
-# Wir nutzen die stabile v1 API für Gemini 1.5 Flash
+# Wir nutzen Gemini 1.5 Flash Latest auf der v1beta API
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ÄNDERUNG: "v1beta" -> "v1"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+# WICHTIG: "gemini-1.5-flash-latest" ist oft robuster als der Kurzname
+# Wir nutzen wieder v1beta, da neuere Modelle dort zuverlässiger sind
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
 
 def get_db_categories(sb):
     """Liest Kategorien aus der Supabase DB."""
@@ -49,7 +50,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     headers = {'Content-Type': 'application/json'}
 
     try:
-        sys.stderr.write(f"DEBUG: Frage Gemini (v1) nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Frage Gemini (v1beta/latest) nach '{item_name}'...\n")
         
         response = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=10)
         
