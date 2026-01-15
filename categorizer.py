@@ -1,17 +1,24 @@
 import os
-import requests
 import sys
-import json
+import google.generativeai as genai
 
-# Wir nutzen Gemini 1.5 Flash Latest auf der v1beta API
+# Konfiguration des Clients (Ähnlich wie create_client bei Supabase)
+# Das SDK kümmert sich automatisch um URLs und Versionierung
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# WICHTIG: "gemini-1.5-flash-latest" ist oft robuster als der Kurzname
-# Wir nutzen wieder v1beta, da neuere Modelle dort zuverlässiger sind
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={GEMINI_API_KEY}"
+def configure_genai():
+    """Initialisiert den Google Client, falls ein Key vorhanden ist."""
+    if not GEMINI_API_KEY:
+        return False
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        return True
+    except Exception as e:
+        sys.stderr.write(f"!!! GEMINI CONFIG ERROR: {e}\n")
+        return False
 
 def get_db_categories(sb):
-    """Liest Kategorien aus der Supabase DB."""
+    """Liest Kategorien aus der Supabase DB (unverändert)."""
     try:
         res = sb.table("resource_categories").select("id, name, keywords").execute()
         rows = getattr(res, "data", []) or []
@@ -26,55 +33,44 @@ def get_db_categories(sb):
         return []
 
 def get_ai_category_name(valid_categories_names, item_name):
-    """Fragt Google Gemini nach der Kategorie."""
-    if not GEMINI_API_KEY:
-        sys.stderr.write("DEBUG: KI übersprungen (Kein GEMINI_API_KEY gesetzt)\n")
+    """Nutzt das Google SDK für die Anfrage."""
+    if not configure_genai():
+        sys.stderr.write("DEBUG: KI übersprungen (Kein GEMINI_API_KEY)\n")
         return None
     
     cats_str = ", ".join(valid_categories_names)
+    prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie, ohne Satzzeichen."
     
-    # Prompt
-    prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie, ohne Satzzeichen oder Erklärung."
-    
-    # Payload für Gemini API
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 20
-        }
-    }
-    
-    headers = {'Content-Type': 'application/json'}
-
     try:
-        sys.stderr.write(f"DEBUG: Frage Gemini (v1beta/latest) nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Frage Gemini SDK nach '{item_name}'...\n")
         
-        response = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=10)
+        # Modell-Instanziierung (wie sb.table(...))
+        # Wir nutzen 'gemini-1.5-flash', da es schnell und effizient ist.
+        # Fallback auf 'gemini-pro' möglich, falls Flash in der Region nicht verfügbar ist.
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        if response.status_code != 200:
-            sys.stderr.write(f"!!! KI API FEHLER: {response.status_code} - {response.text}\n")
-            return None
+        # Der eigentliche Aufruf (wie .execute())
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=20
+            )
+        )
+        
+        # Antwort verarbeiten
+        if response.text:
+            content = response.text.strip()
+            sys.stderr.write(f"DEBUG: KI Antwort: '{content}'\n")
 
-        # Antwort parsen
-        data = response.json()
-        try:
-            content = data['candidates'][0]['content']['parts'][0]['text'].strip()
-        except (KeyError, IndexError):
-            sys.stderr.write(f"!!! KI Antwort Format unerwartet: {data}\n")
-            return None
+            for cat_name in valid_categories_names:
+                if cat_name.lower() in content.lower():
+                    return cat_name
+        else:
+            sys.stderr.write("DEBUG: Leere Antwort von KI\n")
 
-        sys.stderr.write(f"DEBUG: KI Antwort für '{item_name}': '{content}'\n")
-
-        # Validierung: Ist die Antwort eine bekannte Kategorie?
-        for cat_name in valid_categories_names:
-            if cat_name.lower() in content.lower():
-                return cat_name
-                
     except Exception as e:
-        sys.stderr.write(f"!!! KI CRASH: {e}\n")
+        sys.stderr.write(f"!!! KI SDK FEHLER: {e}\n")
         
     return None
 
@@ -94,7 +90,7 @@ def get_category_id_for_item(sb, name):
     all_categories = get_db_categories(sb)
     if not all_categories: return None 
 
-    # 2. Exakte Keywords prüfen (lokal, schnell)
+    # 2. Exakte Keywords prüfen
     for cat in all_categories:
         if any(kw in name_clean for kw in cat["keywords"]):
             sys.stderr.write(f"DEBUG: Keyword Treffer für '{name_clean}' -> {cat['name']}\n")
@@ -105,7 +101,7 @@ def get_category_id_for_item(sb, name):
             except: pass
             return cat["id"]
 
-    # 3. KI fragen (Google Gemini)
+    # 3. KI fragen (via SDK)
     valid_names = [c["name"] for c in all_categories]
     found_name = get_ai_category_name(valid_names, name)
 

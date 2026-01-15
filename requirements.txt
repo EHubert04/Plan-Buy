@@ -2,3 +2,4 @@ Flask
 gunicorn
 supabase
 requests
+google-generativeai
