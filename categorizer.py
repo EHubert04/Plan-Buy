@@ -2,12 +2,12 @@ import os
 import requests
 import sys
 import time
+from huggingface_hub import InferenceClient
 
 # Wir nutzen das Zero-Shot Modell via Router
 MODEL_ID = "facebook/bart-large-mnli"
 HF_API_URL = f"https://router.huggingface.co/models/{MODEL_ID}"
-HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
-
+HF_TOKEN = os.environ.get("HF_TOKEN") 
 def get_db_categories(sb):
     # (Dieser Teil bleibt unverändert)
     try:
@@ -28,62 +28,34 @@ def get_ai_category_name(valid_categories_names, item_name):
         sys.stderr.write("DEBUG: KI übersprungen (Kein HF_TOKEN)\n")
         return None
     
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    
-    # --- WICHTIGE ÄNDERUNG ---
-    # Kein Chat-Prompt mehr! Wir senden das Item und die Liste der Labels.
-    # Das Zero-Shot Modell erwartet "candidate_labels" in den Parametern.
-    payload = {
-        "inputs": item_name,
-        "parameters": {
-            "candidate_labels": valid_categories_names,
-            "multi_label": False
-        }
-    }
-    # -------------------------
-    
-    # Retry-Loop, falls das Modell noch lädt (Error 503)
-    for attempt in range(3):
-        try:
-            sys.stderr.write(f"DEBUG: Sende Zero-Shot Anfrage für '{item_name}' (Versuch {attempt+1})...\n")
-            
-            response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
-            
-            # Fehlerprüfung
-            if response.status_code != 200:
-                sys.stderr.write(f"!!! API Status {response.status_code}: {response.text}\n")
-                # Wenn das Modell lädt, warten wir kurz
-                if "loading" in response.text.lower():
-                    time.sleep(3)
-                    continue
-                return None
+    # Client initialisieren (Modell wird hier definiert)
+    client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
 
-            result = response.json()
-
-            # Manchmal ist das Ergebnis eine Liste, manchmal ein Dict
-            if isinstance(result, list):
-                result = result[0]
-            
-            # Prüfen, ob wir Labels zurückbekommen haben
-            if "labels" in result and "scores" in result:
-                best_label = result['labels'][0]
-                best_score = result['scores'][0]
-                
-                sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
-                
-                if best_score > 0.2:
-                    return best_label
-                else:
-                    return None
-            else:
-                sys.stderr.write(f"!!! Unerwartetes Antwortformat: {result}\n")
-                return None
-
-        except Exception as e:
-            sys.stderr.write(f"!!! KI CRASH: {e}\n")
-            return None
+    try:
+        sys.stderr.write(f"DEBUG: Sende Zero-Shot Anfrage via Library für '{item_name}'...\n")
         
-    return None
+        # Die Library hat eine spezielle Methode für Zero-Shot
+        # Wir übergeben den Text und die Labels (Kategorien)
+        result = client.zero_shot_classification(
+            text=item_name,
+            labels=valid_categories_names,
+            multi_label=False
+        )
+        
+        best_match = result[0] # Das beste Ergebnis steht an erster Stelle
+        best_label = best_match.label if hasattr(best_match, 'label') else best_match['label']
+        best_score = best_match.score if hasattr(best_match, 'score') else best_match['score']
+
+        sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
+
+        if best_score > 0.2:
+            return best_label
+        
+        return None
+
+    except Exception as e:
+        sys.stderr.write(f"!!! KI CRASH (HuggingFace Hub): {e}\n")
+        return None
 
 def get_category_id_for_item(sb, name):
     # (Dieser Teil bleibt exakt gleich wie vorher)
