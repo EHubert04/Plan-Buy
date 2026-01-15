@@ -3,12 +3,10 @@ import requests
 import sys
 import time
 
-# Token laden
-HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
-
-# Wir nutzen das Zero-Shot Modell via neuer Router-URL
+# Wir nutzen das Zero-Shot Modell via Router
 MODEL_ID = "facebook/bart-large-mnli"
-API_URL = f"https://router.huggingface.co/models/{MODEL_ID}"
+HF_API_URL = f"https://router.huggingface.co/models/{MODEL_ID}"
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 
 def get_db_categories(sb):
     # (Dieser Teil bleibt unverändert)
@@ -25,69 +23,65 @@ def get_db_categories(sb):
         sys.stderr.write(f"!!! DB LOAD ERROR: {e}\n")
         return []
 
-def query_huggingface(payload, retries=3):
-    """Hilfsfunktion für den Request mit Retry-Logik bei 'Model Loading'"""
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    
-    for i in range(retries):
-        try:
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
-            data = response.json()
-            
-            # Fall 1: Modell lädt noch -> Warten und nochmal versuchen
-            if isinstance(data, dict) and "error" in data and "loading" in data.get("error", "").lower():
-                wait_time = data.get("estimated_time", 5)
-                sys.stderr.write(f"DEBUG: Modell lädt noch... warte {wait_time:.1f}s (Versuch {i+1}/{retries})\n")
-                time.sleep(wait_time)
-                continue # Nächster Schleifendurchlauf
-            
-            return data
-            
-        except Exception as e:
-            sys.stderr.write(f"!!! API Request Fehler: {e}\n")
-            
-    return None
-
 def get_ai_category_name(valid_categories_names, item_name):
     if not HF_TOKEN:
         sys.stderr.write("DEBUG: KI übersprungen (Kein HF_TOKEN)\n")
         return None
     
-    # Payload für Zero-Shot Classification
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    
+    # --- WICHTIGE ÄNDERUNG ---
+    # Kein Chat-Prompt mehr! Wir senden das Item und die Liste der Labels.
+    # Das Zero-Shot Modell erwartet "candidate_labels" in den Parametern.
     payload = {
         "inputs": item_name,
-        "parameters": {"candidate_labels": valid_categories_names}
+        "parameters": {
+            "candidate_labels": valid_categories_names,
+            "multi_label": False
+        }
     }
+    # -------------------------
     
-    try:
-        sys.stderr.write(f"DEBUG: Starte Zero-Shot für '{item_name}'...\n")
-        
-        result = query_huggingface(payload)
-        
-        # Sicherstellen, dass wir Daten haben
-        if not result:
+    # Retry-Loop, falls das Modell noch lädt (Error 503)
+    for attempt in range(3):
+        try:
+            sys.stderr.write(f"DEBUG: Sende Zero-Shot Anfrage für '{item_name}' (Versuch {attempt+1})...\n")
+            
+            response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
+            
+            # Fehlerprüfung
+            if response.status_code != 200:
+                sys.stderr.write(f"!!! API Status {response.status_code}: {response.text}\n")
+                # Wenn das Modell lädt, warten wir kurz
+                if "loading" in response.text.lower():
+                    time.sleep(3)
+                    continue
+                return None
+
+            result = response.json()
+
+            # Manchmal ist das Ergebnis eine Liste, manchmal ein Dict
+            if isinstance(result, list):
+                result = result[0]
+            
+            # Prüfen, ob wir Labels zurückbekommen haben
+            if "labels" in result and "scores" in result:
+                best_label = result['labels'][0]
+                best_score = result['scores'][0]
+                
+                sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
+                
+                if best_score > 0.2:
+                    return best_label
+                else:
+                    return None
+            else:
+                sys.stderr.write(f"!!! Unerwartetes Antwortformat: {result}\n")
+                return None
+
+        except Exception as e:
+            sys.stderr.write(f"!!! KI CRASH: {e}\n")
             return None
-
-        # Falls die API eine Liste zurückgibt (manchmal bei Router der Fall)
-        if isinstance(result, list):
-            result = result[0]
-
-        # Fehler-Check: Haben wir überhaupt Labels bekommen?
-        if "labels" not in result or "scores" not in result:
-            sys.stderr.write(f"!!! KI Fehler: Unerwartete Antwort: {result}\n")
-            return None
-
-        # Auslesen
-        best_label = result['labels'][0]
-        best_score = result['scores'][0]
-        
-        sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
-        
-        if best_score > 0.2:
-            return best_label
-        
-    except Exception as e:
-        sys.stderr.write(f"!!! KI CRASH: {e}\n")
         
     return None
 
