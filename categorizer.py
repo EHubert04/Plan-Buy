@@ -3,8 +3,8 @@ import requests
 import sys
 
 # 1. Hier oben die URL ändern (das "/v1/chat/completions" fällt weg)
-MODEL_ID = "microsoft/Phi-3.5-mini-instruct"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+
+HF_API_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 def get_db_categories(sb):
@@ -43,7 +43,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     }
     
     try:
-        sys.stderr.write(f"DEBUG: Frage KI (Phi-3.5) nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Frage KI nach '{item_name}'...\n")
         
         # Hier nutzen wir die Variable von ganz oben
         response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
