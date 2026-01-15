@@ -28,35 +28,60 @@ def get_ai_category_name(valid_categories_names, item_name):
         sys.stderr.write("DEBUG: KI übersprungen (Kein HF_TOKEN)\n")
         return None
     
-    # Client initialisieren (Modell wird hier definiert)
     client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
 
     try:
         sys.stderr.write(f"DEBUG: Sende Zero-Shot Anfrage via Library für '{item_name}'...\n")
         
-        # Die Library hat eine spezielle Methode für Zero-Shot
-        # Wir übergeben den Text und die Labels (Kategorien)
+        # KORREKTUR: Wir nutzen 'candidate_labels' statt 'labels'
         result = client.zero_shot_classification(
             text=item_name,
-            labels=valid_categories_names,
+            candidate_labels=valid_categories_names, 
             multi_label=False
         )
         
-        best_match = result[0] # Das beste Ergebnis steht an erster Stelle
-        best_label = best_match.label if hasattr(best_match, 'label') else best_match['label']
-        best_score = best_match.score if hasattr(best_match, 'score') else best_match['score']
+        # Debug: Schauen, was zurückkommt (falls wir unsicher sind)
+        # sys.stderr.write(f"DEBUG: Raw Result: {result}\n")
 
-        sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
-
-        if best_score > 0.2:
-            return best_label
+        # Das Ergebnis ist meist ein Objekt oder Dict. Wir greifen sicher darauf zu.
+        # Bei einzelnen Items kommt meist direkt das Ergebnis, keine Liste.
         
+        # Wir versuchen, Label und Score zu extrahieren
+        # Das Objekt hat normalerweise Attribute oder Keys für 'labels' und 'scores' (Listen)
+        
+        best_label = None
+        best_score = 0.0
+
+        # Fall 1: Ergebnis verhält sich wie ein Dictionary (oder Objekt mit Listen)
+        # Struktur: {'labels': ['Obst', 'Werkzeug'], 'scores': [0.9, 0.1], ...}
+        if hasattr(result, "labels") and hasattr(result, "scores"):
+            best_label = result.labels[0]
+            best_score = result.scores[0]
+        elif isinstance(result, dict) and "labels" in result and "scores" in result:
+            best_label = result["labels"][0]
+            best_score = result["scores"][0]
+        # Fall 2: Es ist eine Liste von Ergebnissen (passiert manchmal bei Batches)
+        elif isinstance(result, list) and len(result) > 0:
+             first = result[0]
+             if hasattr(first, "label") and hasattr(first, "score"):
+                 # Manche Versionen geben eine Liste von Objekten [{'label': 'x', 'score': 0.9}]
+                 best_label = first.label
+                 best_score = first.score
+             elif isinstance(first, dict):
+                 best_label = first.get("label")
+                 best_score = first.get("score")
+
+        if best_label:
+            sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
+            if best_score > 0.2:
+                return best_label
+        
+        sys.stderr.write(f"DEBUG: Kein eindeutiges Ergebnis oder falsches Format: {result}\n")
         return None
 
     except Exception as e:
         sys.stderr.write(f"!!! KI CRASH (HuggingFace Hub): {e}\n")
         return None
-
 def get_category_id_for_item(sb, name):
     # (Dieser Teil bleibt exakt gleich wie vorher)
     if not name: return None
