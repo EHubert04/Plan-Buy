@@ -26,7 +26,7 @@ def get_ai_category_name(valid_categories_names, item_name):
         sys.stderr.write("DEBUG: KI übersprungen (Kein Token)\n")
         return None
     
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    headers = {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"}
     cats_str = ", ".join(valid_categories_names)
     
     # Prompt formatieren
