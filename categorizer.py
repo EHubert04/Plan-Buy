@@ -1,17 +1,14 @@
 import os
 import requests
 import sys
+import json
 
-# Wir nutzen Phi-3.5, da dein Code einen Chat-Prompt sendet
-MODEL_ID = "microsoft/Phi-3.5-mini-instruct"
-
-# WICHTIG: Die neue URL mit "router" UND "hf-inference"
-HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{MODEL_ID}"
-
-# Token laden (probiert beide gängigen Variablennamen)
-HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+# Wir nutzen Google Gemini 1.5 Flash (sehr schnell & kostenlos im Free Tier)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 def get_db_categories(sb):
+    """Liest Kategorien aus der Supabase DB."""
     try:
         res = sb.table("resource_categories").select("id, name, keywords").execute()
         rows = getattr(res, "data", []) or []
@@ -26,47 +23,49 @@ def get_db_categories(sb):
         return []
 
 def get_ai_category_name(valid_categories_names, item_name):
-    if not HF_TOKEN:
-        sys.stderr.write("DEBUG: KI übersprungen (Kein Token)\n")
+    """Fragt Google Gemini nach der Kategorie."""
+    if not GEMINI_API_KEY:
+        sys.stderr.write("DEBUG: KI übersprungen (Kein GEMINI_API_KEY gesetzt)\n")
         return None
     
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     cats_str = ", ".join(valid_categories_names)
     
-    # Prompt Formatierung für Phi-3 (Chat-Stil)
-    formatted_prompt = f"<|user|>\nOrdne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie.<|end|>\n<|assistant|>"
+    # Prompt
+    prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie, ohne Satzzeichen oder Erklärung."
     
-    # Payload für Text-Generation Modelle
+    # Payload für Gemini API
     payload = {
-        "inputs": formatted_prompt,
-        "parameters": {
-            "max_new_tokens": 50,
-            "return_full_text": False,
-            "temperature": 0.1
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 20
         }
     }
     
+    headers = {'Content-Type': 'application/json'}
+
     try:
-        sys.stderr.write(f"DEBUG: Frage KI (Phi-3.5) nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Frage Gemini nach '{item_name}'...\n")
         
-        response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
+        response = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=10)
         
         if response.status_code != 200:
             sys.stderr.write(f"!!! KI API FEHLER: {response.status_code} - {response.text}\n")
             return None
 
-        # Die Router-API gibt oft eine Liste zurück: [{'generated_text': 'Obst'}]
-        result = response.json()
-        content = ""
-        
-        if isinstance(result, list) and len(result) > 0:
-            content = result[0].get('generated_text', '').strip()
-        elif isinstance(result, dict) and 'generated_text' in result:
-             content = result.get('generated_text', '').strip()
+        # Antwort parsen
+        data = response.json()
+        try:
+            content = data['candidates'][0]['content']['parts'][0]['text'].strip()
+        except (KeyError, IndexError):
+            sys.stderr.write(f"!!! KI Antwort Format unerwartet: {data}\n")
+            return None
 
         sys.stderr.write(f"DEBUG: KI Antwort für '{item_name}': '{content}'\n")
 
-        # Abgleich der Antwort mit den gültigen Kategorien
+        # Validierung: Ist die Antwort eine bekannte Kategorie?
         for cat_name in valid_categories_names:
             if cat_name.lower() in content.lower():
                 return cat_name
@@ -77,6 +76,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     return None
 
 def get_category_id_for_item(sb, name):
+    """Hauptlogik: Cache -> Keywords -> KI -> Fallback"""
     if not name: return None
     name_clean = name.lower().strip()
 
@@ -91,7 +91,7 @@ def get_category_id_for_item(sb, name):
     all_categories = get_db_categories(sb)
     if not all_categories: return None 
 
-    # 2. Exakte Keywords prüfen
+    # 2. Exakte Keywords prüfen (lokal, schnell)
     for cat in all_categories:
         if any(kw in name_clean for kw in cat["keywords"]):
             sys.stderr.write(f"DEBUG: Keyword Treffer für '{name_clean}' -> {cat['name']}\n")
@@ -102,7 +102,7 @@ def get_category_id_for_item(sb, name):
             except: pass
             return cat["id"]
 
-    # 3. KI fragen
+    # 3. KI fragen (Google Gemini)
     valid_names = [c["name"] for c in all_categories]
     found_name = get_ai_category_name(valid_names, name)
 
