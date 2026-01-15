@@ -1,24 +1,15 @@
 import os
 import sys
-import google.generativeai as genai
+from huggingface_hub import InferenceClient
 
-# Konfiguration des Clients (Ähnlich wie create_client bei Supabase)
-# Das SDK kümmert sich automatisch um URLs und Versionierung
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# Wir nutzen wieder den Hugging Face Token
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
-def configure_genai():
-    """Initialisiert den Google Client, falls ein Key vorhanden ist."""
-    if not GEMINI_API_KEY:
-        return False
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        return True
-    except Exception as e:
-        sys.stderr.write(f"!!! GEMINI CONFIG ERROR: {e}\n")
-        return False
+# Spezielles Modell für "Ordne X in Kategorien A, B, C ein"
+MODEL_ID = "facebook/bart-large-mnli"
 
 def get_db_categories(sb):
-    """Liest Kategorien aus der Supabase DB (unverändert)."""
+    # (Dieser Teil bleibt unverändert)
     try:
         res = sb.table("resource_categories").select("id, name, keywords").execute()
         rows = getattr(res, "data", []) or []
@@ -33,53 +24,48 @@ def get_db_categories(sb):
         return []
 
 def get_ai_category_name(valid_categories_names, item_name):
-    """Nutzt das Google SDK für die Anfrage."""
-    if not configure_genai():
-        sys.stderr.write("DEBUG: KI übersprungen (Kein GEMINI_API_KEY)\n")
+    if not HF_TOKEN:
+        sys.stderr.write("DEBUG: KI übersprungen (Kein HF_TOKEN)\n")
         return None
     
-    cats_str = ", ".join(valid_categories_names)
-    prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie, ohne Satzzeichen."
-    
     try:
-        sys.stderr.write(f"DEBUG: Frage Gemini SDK nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Starte Zero-Shot für '{item_name}'...\n")
         
-        # Modell-Instanziierung (wie sb.table(...))
-        # Wir nutzen 'gemini-1.5-flash', da es schnell und effizient ist.
-        # Fallback auf 'gemini-pro' möglich, falls Flash in der Region nicht verfügbar ist.
-        model = genai.GenerativeModel('gemini-pro')
+        # Der offizielle Client kümmert sich um URLs und Header
+        client = InferenceClient(token=HF_TOKEN)
         
-        # Der eigentliche Aufruf (wie .execute())
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.1,
-                max_output_tokens=20
-            )
+        # Die Magie: Wir werfen das Item und die Kategorien direkt rein
+        # Die KI berechnet Wahrscheinlichkeiten für jede Kategorie
+        result = client.zero_shot_classification(
+            item_name,
+            valid_categories_names,
+            model=MODEL_ID
         )
         
-        # Antwort verarbeiten
-        if response.text:
-            content = response.text.strip()
-            sys.stderr.write(f"DEBUG: KI Antwort: '{content}'\n")
-
-            for cat_name in valid_categories_names:
-                if cat_name.lower() in content.lower():
-                    return cat_name
+        # Das Ergebnis ist sortiert nach Wahrscheinlichkeit (höchste zuerst)
+        # Struktur: {'labels': ['Obst', 'Werkzeug'], 'scores': [0.95, 0.05], ...}
+        best_label = result['labels'][0]
+        best_score = result['scores'][0]
+        
+        sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
+        
+        # Optional: Nur akzeptieren, wenn die KI sich halbwegs sicher ist (> 20%)
+        if best_score > 0.2:
+            return best_label
         else:
-            sys.stderr.write("DEBUG: Leere Antwort von KI\n")
+            sys.stderr.write(f"DEBUG: KI unsicher ({best_score:.2f}), überspringe.\n")
 
     except Exception as e:
-        sys.stderr.write(f"!!! KI SDK FEHLER: {e}\n")
+        sys.stderr.write(f"!!! KI CRASH (HuggingFace): {e}\n")
         
     return None
 
 def get_category_id_for_item(sb, name):
-    """Hauptlogik: Cache -> Keywords -> KI -> Fallback"""
+    # (Dieser Teil bleibt exakt gleich wie vorher)
     if not name: return None
     name_clean = name.lower().strip()
 
-    # 1. Cache prüfen
+    # 1. Cache
     try:
         res = sb.table("categorization_cache").select("category_id").eq("keyword", name_clean).execute()
         if res.data and res.data[0]['category_id']:
@@ -90,7 +76,7 @@ def get_category_id_for_item(sb, name):
     all_categories = get_db_categories(sb)
     if not all_categories: return None 
 
-    # 2. Exakte Keywords prüfen
+    # 2. Keywords
     for cat in all_categories:
         if any(kw in name_clean for kw in cat["keywords"]):
             sys.stderr.write(f"DEBUG: Keyword Treffer für '{name_clean}' -> {cat['name']}\n")
@@ -101,7 +87,7 @@ def get_category_id_for_item(sb, name):
             except: pass
             return cat["id"]
 
-    # 3. KI fragen (via SDK)
+    # 3. KI (Zero-Shot)
     valid_names = [c["name"] for c in all_categories]
     found_name = get_ai_category_name(valid_names, name)
 
@@ -115,7 +101,7 @@ def get_category_id_for_item(sb, name):
                 except: pass
                 return cat["id"]
 
-    # 4. Fallback: Sonstiges
+    # 4. Fallback
     for cat in all_categories:
         if cat["name"].lower() == "sonstiges":
             return cat["id"]

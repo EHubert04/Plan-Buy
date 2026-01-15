@@ -2,4 +2,4 @@ Flask
 gunicorn
 supabase
 requests
-google-generativeai
+huggingface_hub
