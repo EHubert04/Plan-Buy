@@ -2,10 +2,7 @@ import os
 import sys
 from huggingface_hub import InferenceClient
 
-# Wir nutzen wieder den Hugging Face Token
 HF_TOKEN = os.environ.get("HF_TOKEN")
-
-# Spezielles Modell für "Ordne X in Kategorien A, B, C ein"
 MODEL_ID = "facebook/bart-large-mnli"
 
 def get_db_categories(sb):
@@ -29,32 +26,30 @@ def get_ai_category_name(valid_categories_names, item_name):
         return None
     
     try:
-        sys.stderr.write(f"DEBUG: Starte Zero-Shot für '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Starte Zero-Shot (BART) für '{item_name}'...\n")
         
-        # Der offizielle Client kümmert sich um URLs und Header
-        client = InferenceClient(token=HF_TOKEN)
+        client = InferenceClient(model=MODEL_ID, token=HF_TOKEN)
         
-        # Die Magie: Wir werfen das Item und die Kategorien direkt rein
-        # Die KI berechnet Wahrscheinlichkeiten für jede Kategorie
         result = client.zero_shot_classification(
             item_name,
-            valid_categories_names,
-            model=MODEL_ID
+            valid_categories_names
         )
         
-        # Das Ergebnis ist sortiert nach Wahrscheinlichkeit (höchste zuerst)
-        # Struktur: {'labels': ['Obst', 'Werkzeug'], 'scores': [0.95, 0.05], ...}
+        # --- HIER IST DER FIX ---
+        # Falls die API eine Liste zurückgibt (z.B. [{...}]), nehmen wir das erste Element.
+        if isinstance(result, list):
+            result = result[0]
+            
+        # Jetzt können wir sicher zugreifen (wir nutzen Dict-Zugriff [], das ist robuster)
         best_label = result['labels'][0]
         best_score = result['scores'][0]
+        # ------------------------
         
         sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
         
-        # Optional: Nur akzeptieren, wenn die KI sich halbwegs sicher ist (> 20%)
         if best_score > 0.2:
             return best_label
-        else:
-            sys.stderr.write(f"DEBUG: KI unsicher ({best_score:.2f}), überspringe.\n")
-
+        
     except Exception as e:
         sys.stderr.write(f"!!! KI CRASH (HuggingFace): {e}\n")
         
