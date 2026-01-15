@@ -2,10 +2,10 @@ import os
 import requests
 import sys
 
-# Wir nutzen die klassische Inference API URL direkt für das Modell
+# 1. Hier oben die URL ändern (das "/v1/chat/completions" fällt weg)
 MODEL_ID = "microsoft/Phi-3.5-mini-instruct"
-HF_API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}/v1/chat/completions"
-HF_TOKEN = os.environ.get("HUGGINGFACE_TOKEN")
+HF_API_URL = f"https://api-inference.huggingface.co/models/{MODEL_ID}"
+HF_TOKEN = os.environ.get("HF_TOKEN")
 
 def get_db_categories(sb):
     try:
@@ -26,27 +26,41 @@ def get_ai_category_name(valid_categories_names, item_name):
         sys.stderr.write("DEBUG: KI übersprungen (Kein Token)\n")
         return None
     
-    headers = {"Authorization": f"Bearer {HF_TOKEN}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     cats_str = ", ".join(valid_categories_names)
-    prompt = f"Ordne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie."
     
-    # Payload ohne "model" Key, da das Modell in der URL steckt
+    # Prompt formatieren
+    formatted_prompt = f"<|user|>\nOrdne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie.<|end|>\n<|assistant|>"
+    
+    # 2. Payload anpassen (inputs statt messages)
     payload = {
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 30, 
-        "temperature": 0.1,
-        "stream": False
+        "inputs": formatted_prompt,
+        "parameters": {
+            "max_new_tokens": 30,
+            "return_full_text": False,
+            "temperature": 0.1
+        }
     }
     
     try:
         sys.stderr.write(f"DEBUG: Frage KI (Phi-3.5) nach '{item_name}'...\n")
+        
+        # Hier nutzen wir die Variable von ganz oben
         response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
         
         if response.status_code != 200:
             sys.stderr.write(f"!!! KI API FEHLER: {response.status_code} - {response.text}\n")
             return None
 
-        content = response.json()['choices'][0]['message']['content'].strip()
+        # 3. Antwort anders auslesen (Liste statt choices)
+        result = response.json()
+        content = ""
+        
+        if isinstance(result, list) and len(result) > 0:
+            content = result[0].get('generated_text', '').strip()
+        elif isinstance(result, dict) and 'generated_text' in result:
+             content = result.get('generated_text', '').strip()
+
         sys.stderr.write(f"DEBUG: KI Antwort für '{item_name}': '{content}'\n")
 
         for cat_name in valid_categories_names:
