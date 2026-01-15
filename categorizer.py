@@ -3,9 +3,11 @@ import requests
 import sys
 import json
 
-# Wir nutzen Google Gemini 1.5 Flash (sehr schnell & kostenlos im Free Tier)
+# Wir nutzen die stabile v1 API für Gemini 1.5 Flash
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+
+# ÄNDERUNG: "v1beta" -> "v1"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 def get_db_categories(sb):
     """Liest Kategorien aus der Supabase DB."""
@@ -47,7 +49,7 @@ def get_ai_category_name(valid_categories_names, item_name):
     headers = {'Content-Type': 'application/json'}
 
     try:
-        sys.stderr.write(f"DEBUG: Frage Gemini nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Frage Gemini (v1) nach '{item_name}'...\n")
         
         response = requests.post(GEMINI_URL, headers=headers, json=payload, timeout=10)
         
