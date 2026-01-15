@@ -47,7 +47,7 @@ def get_ai_category_name(valid_categories_names, item_name):
         # Modell-Instanziierung (wie sb.table(...))
         # Wir nutzen 'gemini-1.5-flash', da es schnell und effizient ist.
         # Fallback auf 'gemini-pro' möglich, falls Flash in der Region nicht verfügbar ist.
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         # Der eigentliche Aufruf (wie .execute())
         response = model.generate_content(
