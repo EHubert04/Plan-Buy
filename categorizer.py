@@ -2,10 +2,14 @@ import os
 import requests
 import sys
 
-# 1. Hier oben die URL ändern (das "/v1/chat/completions" fällt weg)
+# Wir nutzen Phi-3.5, da dein Code einen Chat-Prompt sendet
+MODEL_ID = "microsoft/Phi-3.5-mini-instruct"
 
-HF_API_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-mnli"
-HF_TOKEN = os.environ.get("HF_TOKEN")
+# WICHTIG: Die neue URL mit "router" UND "hf-inference"
+HF_API_URL = f"https://router.huggingface.co/hf-inference/models/{MODEL_ID}"
+
+# Token laden (probiert beide gängigen Variablennamen)
+HF_TOKEN = os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
 
 def get_db_categories(sb):
     try:
@@ -26,33 +30,32 @@ def get_ai_category_name(valid_categories_names, item_name):
         sys.stderr.write("DEBUG: KI übersprungen (Kein Token)\n")
         return None
     
-    headers = {"Authorization": f"Bearer {os.environ['HF_TOKEN']}"}
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
     cats_str = ", ".join(valid_categories_names)
     
-    # Prompt formatieren
+    # Prompt Formatierung für Phi-3 (Chat-Stil)
     formatted_prompt = f"<|user|>\nOrdne das Produkt '{item_name}' einer dieser Kategorien zu: {cats_str}. Antworte NUR mit dem exakten Namen der Kategorie.<|end|>\n<|assistant|>"
     
-    # 2. Payload anpassen (inputs statt messages)
+    # Payload für Text-Generation Modelle
     payload = {
         "inputs": formatted_prompt,
         "parameters": {
-            "max_new_tokens": 30,
+            "max_new_tokens": 50,
             "return_full_text": False,
             "temperature": 0.1
         }
     }
     
     try:
-        sys.stderr.write(f"DEBUG: Frage KI nach '{item_name}'...\n")
+        sys.stderr.write(f"DEBUG: Frage KI (Phi-3.5) nach '{item_name}'...\n")
         
-        # Hier nutzen wir die Variable von ganz oben
         response = requests.post(HF_API_URL, headers=headers, json=payload, timeout=10)
         
         if response.status_code != 200:
             sys.stderr.write(f"!!! KI API FEHLER: {response.status_code} - {response.text}\n")
             return None
 
-        # 3. Antwort anders auslesen (Liste statt choices)
+        # Die Router-API gibt oft eine Liste zurück: [{'generated_text': 'Obst'}]
         result = response.json()
         content = ""
         
@@ -63,19 +66,21 @@ def get_ai_category_name(valid_categories_names, item_name):
 
         sys.stderr.write(f"DEBUG: KI Antwort für '{item_name}': '{content}'\n")
 
+        # Abgleich der Antwort mit den gültigen Kategorien
         for cat_name in valid_categories_names:
             if cat_name.lower() in content.lower():
                 return cat_name
+                
     except Exception as e:
         sys.stderr.write(f"!!! KI CRASH: {e}\n")
         
     return None
 
 def get_category_id_for_item(sb, name):
-    # (Dieser Teil bleibt exakt gleich wie vorher)
     if not name: return None
     name_clean = name.lower().strip()
 
+    # 1. Cache prüfen
     try:
         res = sb.table("categorization_cache").select("category_id").eq("keyword", name_clean).execute()
         if res.data and res.data[0]['category_id']:
@@ -86,6 +91,7 @@ def get_category_id_for_item(sb, name):
     all_categories = get_db_categories(sb)
     if not all_categories: return None 
 
+    # 2. Exakte Keywords prüfen
     for cat in all_categories:
         if any(kw in name_clean for kw in cat["keywords"]):
             sys.stderr.write(f"DEBUG: Keyword Treffer für '{name_clean}' -> {cat['name']}\n")
@@ -96,6 +102,7 @@ def get_category_id_for_item(sb, name):
             except: pass
             return cat["id"]
 
+    # 3. KI fragen
     valid_names = [c["name"] for c in all_categories]
     found_name = get_ai_category_name(valid_names, name)
 
@@ -109,6 +116,7 @@ def get_category_id_for_item(sb, name):
                 except: pass
                 return cat["id"]
 
+    # 4. Fallback: Sonstiges
     for cat in all_categories:
         if cat["name"].lower() == "sonstiges":
             return cat["id"]
