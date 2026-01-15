@@ -5,7 +5,7 @@ import time
 from huggingface_hub import InferenceClient
 
 # Wir nutzen das Zero-Shot Modell via Router
-MODEL_ID = "facebook/bart-large-mnli"
+MODEL_ID = "vicgalle/xlm-roberta-large-xnli-anli"
 HF_API_URL = f"https://router.huggingface.co/models/{MODEL_ID}"
 HF_TOKEN = os.environ.get("HF_TOKEN") 
 def get_db_categories(sb):
