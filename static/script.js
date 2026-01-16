@@ -4,20 +4,17 @@ let supabaseClient = null;
 let accessToken = null;
 
 function setAuthUI(loggedIn) {
-  document.getElementById('auth-overlay').style.display = loggedIn ? 'none' : 'block';
-  document.querySelector('.sidebar').style.display = loggedIn ? 'block' : 'none';
-  document.querySelector('.content').style.display = loggedIn ? 'block' : 'none';
-}
+  // Overlay
+  document.getElementById('auth-overlay').style.display = loggedIn ? 'none' : 'flex';
 
-async function apiFetch(url, options = {}) {
-  const headers = { ...(options.headers || {}) };
-  if (!headers['Content-Type'] && options.method && options.method !== 'GET') {
-    headers['Content-Type'] = 'application/json';
-  }
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`;
-  }
-  return fetch(url, { ...options, headers });
+  // Sidebar & Content sollen IMMER da sein (damit links der dunkle Balken sichtbar bleibt)
+  document.querySelector('.sidebar').style.display = 'block';
+  document.querySelector('.content').style.display = 'block';
+
+  // Aber: Navigation/Buttons in der Sidebar nur anzeigen, wenn eingeloggt
+  document.getElementById('side-nav').style.display = loggedIn ? 'block' : 'none';
+  const newBtn = document.querySelector('.btn-new-project');
+  if (newBtn) newBtn.style.display = loggedIn ? 'block' : 'none';
 }
 
 async function initAuth() {
