@@ -4,6 +4,7 @@ let supabaseClient = null;
 let accessToken = null;
 
 function setAuthUI(loggedIn) {
+  document.body.classList.toggle('logged-out', !loggedIn);
   // Overlay
   document.getElementById('auth-overlay').style.display = loggedIn ? 'none' : 'flex';
 

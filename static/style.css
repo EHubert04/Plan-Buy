@@ -43,7 +43,7 @@ body { display: flex; min-height: 100vh; background: var(--main-bg); color: var(
 /* Main Content */
 .content { margin-left: 280px; flex: 1; padding: 3rem; }
 
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.header h1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; }
 
@@ -178,5 +178,11 @@ li.completed .res-text {
     width: 100%;
   }
 }
+body.logged-out #dashboard,
+body.logged-out #project-detail,
+body.logged-out .header {
+  display: none !important;
+}
+
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }
