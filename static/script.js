@@ -17,6 +17,16 @@ function setAuthUI(loggedIn) {
   const newBtn = document.querySelector('.btn-new-project');
   if (newBtn) newBtn.style.display = loggedIn ? 'block' : 'none';
 }
+async function apiFetch(url, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (!headers['Content-Type'] && options.method && options.method !== 'GET') {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  return fetch(url, { ...options, headers });
+}
 
 async function initAuth() {
   supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY); // :contentReference[oaicite:9]{index=9}
