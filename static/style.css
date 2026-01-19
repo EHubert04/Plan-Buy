@@ -183,7 +183,6 @@ body.logged-out #project-detail,
 body.logged-out .header {
   display: none !important;
 }
-
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }
 
@@ -193,12 +192,22 @@ body.logged-out .header {
     cursor: pointer;
     font-size: 1rem;
     float: right;
-    margin-left: 10px;
+    
+    /* ABSTAND ANPASSEN */
+    margin-left: 15px;  /* Abstand zum Text links */
+    margin-right: 20px; /* Abstand zur Checkbox rechts */
+    
     opacity: 0.5;
     transition: opacity 0.2s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    height: 100%;
 }
-
 .btn-delete:hover {
     opacity: 1;
     transform: scale(1.2);
+}
+/* Optional: Checkbox etwas ausrichten, damit sie bündig wirkt */
+li .todo-checkbox, li .res-checkbox {
+    margin-right: 5px;
 }

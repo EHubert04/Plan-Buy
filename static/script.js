@@ -292,6 +292,31 @@ function initSortableList(listElement) {
             listElement.insertBefore(draggedItem, afterElement);
         }
     });
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.onclick = async (e) => {
+      // Verhindert, dass andere Klick-Events auf dem li ausgelöst werden
+      e.stopPropagation(); 
+      
+      const id = btn.dataset.id;
+      const type = btn.dataset.type;
+
+      if (!confirm("Diesen Eintrag wirklich löschen?")) return;
+
+      const endpoint = type === 'todo' ? 'todos' : 'resources';
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (resp.ok) {
+        // Daten global neu laden und UI aktualisieren
+        await loadData();
+        // Das Projekt wieder öffnen, um die Änderung sofort zu sehen
+        openProject(currentProjectId);
+      } else {
+        alert("Fehler beim Löschen.");
+      }
+    };
+  });
 }
 
 function getDragAfterElement(container, y) {
@@ -310,24 +335,5 @@ function getDragAfterElement(container, y) {
 
     return closest;
 }
-
-document.querySelectorAll('.btn-delete').forEach(btn => {
-  btn.onclick = async (e) => {
-    const id = btn.dataset.id;
-    const type = btn.dataset.type;
-    if (!confirm("Wirklich löschen?")) return;
-
-    const endpoint = type === 'todo' ? 'todos' : 'resources';
-    const resp = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${id}`, {
-      method: 'DELETE'
-    });
-
-    if (resp.ok) {
-      loadData(); // UI aktualisieren
-    } else {
-      alert("Fehler beim Löschen.");
-    }
-  };
-});
 
 initAuth();
