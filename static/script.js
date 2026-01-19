@@ -3,20 +3,18 @@ let allProjects = [];
 let supabaseClient = null;
 let accessToken = null;
 
+// UI-Zustand basierend auf Login-Status anpassen
 function setAuthUI(loggedIn) {
   document.body.classList.toggle('logged-out', !loggedIn);
-  // Overlay
   document.getElementById('auth-overlay').style.display = loggedIn ? 'none' : 'flex';
-
-  // Sidebar & Content sollen IMMER da sein (damit links der dunkle Balken sichtbar bleibt)
   document.querySelector('.sidebar').style.display = 'block';
   document.querySelector('.content').style.display = 'block';
-
-  // Aber: Navigation/Buttons in der Sidebar nur anzeigen, wenn eingeloggt
   document.getElementById('side-nav').style.display = loggedIn ? 'block' : 'none';
   const newBtn = document.querySelector('.btn-new-project');
   if (newBtn) newBtn.style.display = loggedIn ? 'block' : 'none';
 }
+
+// Zentrale Fetch-Funktion mit Auth-Header
 async function apiFetch(url, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (!headers['Content-Type'] && options.method && options.method !== 'GET') {
@@ -28,10 +26,11 @@ async function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers });
 }
 
+// Initialisierung der Authentifizierung
 async function initAuth() {
-  supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY); // :contentReference[oaicite:9]{index=9}
+  supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
 
-  const { data } = await supabaseClient.auth.getSession(); // 
+  const { data } = await supabaseClient.auth.getSession();
   accessToken = data?.session?.access_token ?? null;
 
   setAuthUI(!!accessToken);
@@ -49,11 +48,9 @@ async function signUp() {
   const password = document.getElementById('auth-password').value;
   const msg = document.getElementById('auth-msg');
 
-  const { error, data } = await supabaseClient.auth.signUp({ email, password }); // :contentReference[oaicite:11]{index=11}
+  const { error, data } = await supabaseClient.auth.signUp({ email, password });
   if (error) { msg.textContent = error.message; return; }
-
-  // je nach Supabase Setting kann Email-Confirm aktiv sein
-  msg.textContent = data?.session ? "Account erstellt & eingeloggt." : "Account erstellt. Bitte E-Mail bestätigen (falls aktiviert).";
+  msg.textContent = data?.session ? "Account erstellt & eingeloggt." : "Account erstellt. Bitte E-Mail bestätigen.";
 }
 
 async function signIn() {
@@ -61,7 +58,7 @@ async function signIn() {
   const password = document.getElementById('auth-password').value;
   const msg = document.getElementById('auth-msg');
 
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password }); // :contentReference[oaicite:12]{index=12}
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
   if (error) { msg.textContent = error.message; return; }
   msg.textContent = "";
 }
@@ -114,6 +111,7 @@ function openProject(id) {
   document.getElementById('project-detail').style.display = 'block';
   document.getElementById('detail-title').innerText = project.name;
 
+  // Listen rendern
   document.getElementById('todo-list').innerHTML =
     project.todos.map((todo) => 
     `<li class="${todo.done ? 'completed' : ''}">
@@ -145,82 +143,75 @@ function openProject(id) {
       </li>
     `).join('');
 
-  // Todo Toggle -> DB speichern
+  // Todo Toggle
   document.querySelectorAll('.todo-checkbox').forEach(cb => {
     cb.addEventListener('change', async (e) => {
       const todoId = e.target.dataset.id;
       const done = e.target.checked;
-
-      const li = e.target.closest('li');
-      li.classList.toggle('completed', done);
-
       const resp = await apiFetch(`/api/projects/${currentProjectId}/todos/${todoId}`, {
         method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ done })
       });
-
-      if (!resp.ok) {
-        li.classList.toggle('completed', !done);
-        e.target.checked = !done;
-        alert("Fehler beim Speichern (Todo).");
-        return;
-      }
-
+      if (!resp.ok) { alert("Fehler beim Speichern."); return; }
       const t = project.todos.find(x => String(x.id) === String(todoId));
       if (t) t.done = done;
+      openProject(currentProjectId); // UI Refresh
     });
   });
 
-  // Resource purchased Toggle -> DB speichern
+  // Resource Toggle
   document.querySelectorAll('.res-checkbox').forEach(cb => {
     cb.addEventListener('change', async (e) => {
       const resId = e.target.dataset.id;
       const purchased = e.target.checked;
-
-      const li = e.target.closest('li');
-      li.classList.toggle('completed', purchased);
-
       const resp = await apiFetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
         method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ purchased })
       });
-
-      if (!resp.ok) {
-        li.classList.toggle('completed', !purchased);
-        e.target.checked = !purchased;
-        alert("Fehler beim Speichern (Ressource).");
-        return;
-      }
-
+      if (!resp.ok) { alert("Fehler beim Speichern."); return; }
       const r = project.resources.find(x => String(x.id) === String(resId));
       if (r) r.purchased = purchased;
+      openProject(currentProjectId);
     });
   });
 
-  // Quantity Änderung -> DB speichern
+  // Quantity Änderung
   document.querySelectorAll('.res-quantity').forEach(inp => {
     inp.addEventListener('change', async (e) => {
       const resId = e.target.dataset.id;
       let quantity = parseInt(e.target.value, 10);
       if (!Number.isFinite(quantity) || quantity < 1) quantity = 1;
-      e.target.value = quantity;
-
       const resp = await apiFetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
         method: 'PATCH',
-        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ quantity })
       });
-
-      if (!resp.ok) {
-        alert("Fehler beim Speichern (Menge).");
-        return;
-      }
-
+      if (!resp.ok) { alert("Fehler beim Speichern."); return; }
       const r = project.resources.find(x => String(x.id) === String(resId));
       if (r) r.quantity = quantity;
     });
+  });
+
+  // NEU: Löschen-Buttons (muss in openProject stehen!)
+  document.querySelectorAll('.btn-delete').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation(); 
+      const id = btn.dataset.id;
+      const type = btn.dataset.type;
+
+      if (!confirm("Diesen Eintrag wirklich löschen?")) return;
+
+      const endpoint = type === 'todo' ? 'todos' : 'resources';
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${id}`, {
+        method: 'DELETE'
+      });
+
+      if (resp.ok) {
+        await loadData();
+        openProject(currentProjectId);
+      } else {
+        alert("Fehler beim Löschen.");
+      }
+    };
   });
 }
 
@@ -234,22 +225,11 @@ async function saveItem(type) {
     body: JSON.stringify({ type, content })
   });
 
-  if (!resp.ok) {
-    console.error(await resp.text());
-    alert("Fehler beim Speichern.");
-    return;
-  }
-
+  if (!resp.ok) { alert("Fehler beim Speichern."); return; }
   const updatedProject = await resp.json();
-
-  // Local state aktualisieren
   const idx = allProjects.findIndex(p => String(p.id) === String(updatedProject.id));
   if (idx >= 0) allProjects[idx] = updatedProject;
-  else allProjects.push(updatedProject);
-
   input.value = '';
-
-  // UI neu rendern + Projekt neu öffnen (zeigt sofort Ressourcen)
   renderUI();
   openProject(updatedProject.id);
 }
@@ -257,83 +237,6 @@ async function saveItem(type) {
 function showDashboard() {
     document.getElementById('dashboard').style.display = 'block';
     document.getElementById('project-detail').style.display = 'none';
-}
-
-// --- Drag & Drop für Listen ---
-function initSortableList(listElement) {
-    if (!listElement) return;
-
-    let draggedItem = null;
-
-    // Setze alle Listeneinträge auf draggable
-    listElement.querySelectorAll("li").forEach(li => {
-        li.draggable = true;
-
-        li.addEventListener("dragstart", () => {
-            draggedItem = li;
-            li.classList.add("dragging");
-        });
-
-        li.addEventListener("dragend", () => {
-            li.classList.remove("dragging");
-            draggedItem = null;
-        });
-    });
-
-    // Dragover Event für Drop
-    listElement.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        const afterElement = getDragAfterElement(listElement, e.clientY);
-        if (!draggedItem) return;
-
-        if (afterElement == null) {
-            listElement.appendChild(draggedItem);
-        } else {
-            listElement.insertBefore(draggedItem, afterElement);
-        }
-    });
-    document.querySelectorAll('.btn-delete').forEach(btn => {
-    btn.onclick = async (e) => {
-      // Verhindert, dass andere Klick-Events auf dem li ausgelöst werden
-      e.stopPropagation(); 
-      
-      const id = btn.dataset.id;
-      const type = btn.dataset.type;
-
-      if (!confirm("Diesen Eintrag wirklich löschen?")) return;
-
-      const endpoint = type === 'todo' ? 'todos' : 'resources';
-      const resp = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (resp.ok) {
-        // Daten global neu laden und UI aktualisieren
-        await loadData();
-        // Das Projekt wieder öffnen, um die Änderung sofort zu sehen
-        openProject(currentProjectId);
-      } else {
-        alert("Fehler beim Löschen.");
-      }
-    };
-  });
-}
-
-function getDragAfterElement(container, y) {
-    const elements = [...container.querySelectorAll("li:not(.dragging)")];
-    let closest = null;
-    let closestOffset = Number.NEGATIVE_INFINITY;
-
-    elements.forEach(child => {
-        const box = child.getBoundingClientRect();
-        const offset = y - box.top - box.height / 2;
-        if (offset < 0 && offset > closestOffset) {
-            closestOffset = offset;
-            closest = child;
-        }
-    });
-
-    return closest;
 }
 
 initAuth();
