@@ -244,3 +244,19 @@ def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purc
     if error(res):
         raise RuntimeError(str(error(res)))
     return bool(data(res))
+
+def delete_todo(sb: Client, project_id: int, user_id: str, todo_id: int) -> bool:
+    if not ensure_project_owned(sb, project_id, user_id):
+        return False
+    res = sb.table("todos").delete().eq("id", todo_id).eq("project_id", project_id).execute()
+    if error(res):
+        raise RuntimeError(str(error(res)))
+    return bool(data(res))
+
+def delete_resource(sb: Client, project_id: int, user_id: str, res_id: int) -> bool:
+    if not ensure_project_owned(sb, project_id, user_id):
+        return False
+    res = sb.table("resources").delete().eq("id", res_id).eq("project_id", project_id).execute()
+    if error(res):
+        raise RuntimeError(str(error(res)))
+    return bool(data(res))

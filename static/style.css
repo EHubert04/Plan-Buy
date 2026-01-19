@@ -186,3 +186,19 @@ body.logged-out .header {
 
 .project-nav li:hover { background: #334155; border: none;}
 .project-nav li.active { background: var(--accent); }
+
+.btn-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    float: right;
+    margin-left: 10px;
+    opacity: 0.5;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.btn-delete:hover {
+    opacity: 1;
+    transform: scale(1.2);
+}

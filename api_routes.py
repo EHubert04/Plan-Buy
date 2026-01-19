@@ -8,6 +8,8 @@ from repo import (
     add_item,
     update_todo,
     update_resource,
+    delete_todo,
+    delete_resource
 )
 
 api_bp = Blueprint("api", __name__)
@@ -124,6 +126,34 @@ def update_resource_route(p_id: int, res_id: int):
         quantity = body.get("quantity", None)
 
         ok = update_resource(sb, p_id, user_id, res_id, purchased=purchased, quantity=quantity)
+        if not ok:
+            return jsonify({"error": "not found"}), 404
+        return jsonify({"status": "success"})
+    except HTTPException as e:
+        return jsonify({"error": "unauthorized"}), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@api_bp.delete("/api/projects/<int:p_id>/todos/<int:todo_id>")
+def delete_todo_route(p_id: int, todo_id: int):
+    try:
+        user_id = require_user_id()
+        sb = get_supabase_admin()
+        ok = delete_todo(sb, p_id, user_id, todo_id)
+        if not ok:
+            return jsonify({"error": "not found"}), 404
+        return jsonify({"status": "success"})
+    except HTTPException as e:
+        return jsonify({"error": "unauthorized"}), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api_bp.delete("/api/projects/<int:p_id>/resources/<int:res_id>")
+def delete_resource_route(p_id: int, res_id: int):
+    try:
+        user_id = require_user_id()
+        sb = get_supabase_admin()
+        ok = delete_resource(sb, p_id, user_id, res_id)
         if not ok:
             return jsonify({"error": "not found"}), 404
         return jsonify({"status": "success"})

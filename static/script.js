@@ -115,17 +115,15 @@ function openProject(id) {
   document.getElementById('detail-title').innerText = project.name;
 
   document.getElementById('todo-list').innerHTML =
-    project.todos.map((todo) => `
-      <li class="${todo.done ? 'completed' : ''}">
-        <label>
-          <input type="checkbox"
-                 class="todo-checkbox"
-                 data-id="${todo.id}"
-                 ${todo.done ? 'checked' : ''}>
-          <span class="todo-text">${todo.content}</span>
-        </label>
-      </li>
-    `).join('');
+    project.todos.map((todo) => 
+    `<li class="${todo.done ? 'completed' : ''}">
+      <label>
+      <input type="checkbox" class="todo-checkbox" data-id="${todo.id}" ${todo.done ? 'checked' : ''}>
+      <span class="todo-text">${todo.content}</span>
+      </label>
+      <button class="btn-delete" data-id="${todo.id}" data-type="todo">🗑️</button>
+    </li>`
+    ).join('');
 
   document.getElementById('res-list').innerHTML =
     project.resources.map((res) => `
@@ -143,6 +141,7 @@ function openProject(id) {
                class="res-checkbox"
                data-id="${res.id}"
                ${res.purchased ? 'checked' : ''}>
+        <button class="btn-delete" data-id="${res.id}" data-type="resource">🗑️</button>
       </li>
     `).join('');
 
@@ -312,6 +311,23 @@ function getDragAfterElement(container, y) {
     return closest;
 }
 
+document.querySelectorAll('.btn-delete').forEach(btn => {
+  btn.onclick = async (e) => {
+    const id = btn.dataset.id;
+    const type = btn.dataset.type;
+    if (!confirm("Wirklich löschen?")) return;
 
+    const endpoint = type === 'todo' ? 'todos' : 'resources';
+    const resp = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (resp.ok) {
+      loadData(); // UI aktualisieren
+    } else {
+      alert("Fehler beim Löschen.");
+    }
+  };
+});
 
 initAuth();
