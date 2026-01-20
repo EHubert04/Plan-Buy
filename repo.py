@@ -1,10 +1,10 @@
-
 from typing import Dict, List, Optional
 from supabase import Client
 from supabase_utils import data, error
 # WICHTIG: Hier importieren wir jetzt die NEUE Funktion
 from categorizer import get_category_id_for_item
 import sys
+
 def _pid(v):
     try:
         return int(v)
@@ -93,6 +93,10 @@ def fetch_projects_for_user(sb: Client, user_id: str) -> List[Dict]:
             "category": row.get("category"), # Name wurde durch _attach_category_names angefügt
         })
 
+    # Sortierung für jedes Projekt anwenden
+    for pid in resources_by_pid:
+        resources_by_pid[pid].sort(key=lambda x: (x.get("category") or "zzz", x.get("name") or ""))
+
     return [{
         "id": p["id"],
         "name": p["name"],
@@ -128,6 +132,9 @@ def fetch_project_for_user(sb: Client, project_id: int, user_id: str) -> Optiona
     except Exception:
         pass
 
+    # Ressourcen nach Kategorie (und dann Name) sortieren
+    resources.sort(key=lambda x: (x.get("category") or "zzz", x.get("name") or ""))
+
     for r in resources:
         if r.get("quantity") is None: r["quantity"] = 1
 
@@ -155,7 +162,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
         # Ressource Logik:
         cat_id = None
         
-        # DEBUG: Sag uns, dass du startest! (Benutze stderr, das wird nie verschluckt)
+        # DEBUG: Sag uns, dass du startest!
         sys.stderr.write(f"DEBUG: Starte Kategorisierung für '{content}'...\n")
         
         try:
@@ -225,7 +232,7 @@ def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purc
         .execute()
     )
     
-    # Optional: Lernen bei manueller Änderung (siehe vorherige Diskussion)
+    # Optional: Lernen bei manueller Änderung
     if category_id is not None and data(res):
         try:
             item_name = data(res)[0]["name"]
