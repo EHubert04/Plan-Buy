@@ -197,9 +197,6 @@ def update_todo(sb: Client, project_id: int, user_id: str, todo_id: int, done: b
     res = sb.table("todos").update({"done": bool(done)}).eq("id", todo_id).eq("project_id", project_id).execute()
     return bool(data(res))
 
-def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, **kwargs) -> bool:
-    if not ensure_project_owned(sb, project_id, user_id):
-
 def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purchased: Optional[bool] = None, quantity: Optional[int] = None, category_id: Optional[int] = None) -> bool:
     if not ensure_project_access(sb, project_id, user_id):
         return False
