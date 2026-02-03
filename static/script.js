@@ -98,6 +98,25 @@ async function addProject() {
     loadData();
 }
 
+async function shareCurrentProject() {
+  if (!currentProjectId) return;
+
+  const email = prompt("E-Mail des Users, den du einladen willst:");
+  if (!email) return;
+
+  const resp = await apiFetch(`/api/projects/${currentProjectId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ email })
+  });
+
+  if (!resp.ok) {
+    alert("Fehler beim Einladen: " + await resp.text());
+    return;
+  }
+
+  alert("User wurde eingeladen.");
+}
+
 function openProject(id) {
   const project = allProjects.find(p => String(p.id) === String(id));
   if (!project) {

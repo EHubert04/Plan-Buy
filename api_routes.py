@@ -9,7 +9,8 @@ from repo import (
     update_todo,
     update_resource,
     delete_todo,
-    delete_resource
+    delete_resource,
+    add_project_member_by_email,
 )
 
 api_bp = Blueprint("api", __name__)
@@ -159,5 +160,27 @@ def delete_resource_route(p_id: int, res_id: int):
         return jsonify({"status": "success"})
     except HTTPException as e:
         return jsonify({"error": "unauthorized"}), e.code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@api_bp.post("/api/projects/<int:p_id>/members")
+def add_member_route(p_id: int):
+    try:
+        user_id = require_user_id()
+        sb = get_supabase_admin()
+
+        body = request.get_json(force=True) or {}
+        email = (body.get("email") or "").strip()
+        if not email:
+            return jsonify({"error": "email is required"}), 400
+
+        member = add_project_member_by_email(sb, p_id, user_id, email, role="editor")
+        return jsonify({"ok": True, "member": member})
+    except HTTPException as e:
+        return jsonify({"error": "unauthorized"}), e.code
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
