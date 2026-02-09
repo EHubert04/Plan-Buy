@@ -242,12 +242,32 @@ def delete_resource(sb: Client, project_id: int, user_id: str, res_id: int) -> b
 def _extract_users_from_admin_list(resp):
     if hasattr(resp, "users"):
         return resp.users or []
-    if isinstance(resp, dict) and "users" in resp:
-        return resp.get("users") or []
-    if hasattr(resp, "data") and isinstance(resp.data, dict) and "users" in resp.data:
-        return resp.data.get("users") or []
-    if hasattr(resp, "data") and isinstance(resp.data, list):
-        return resp.data
+
+    if hasattr(resp, "data") and hasattr(resp.data, "users"):
+        return resp.data.users or []
+
+    if isinstance(resp, dict):
+        if "users" in resp:
+            return resp.get("users") or []
+        if "data" in resp and isinstance(resp["data"], dict) and "users" in resp["data"]:
+            return resp["data"].get("users") or []
+
+    if hasattr(resp, "model_dump"):
+        d = resp.model_dump()
+        if isinstance(d, dict):
+            if "users" in d:
+                return d.get("users") or []
+            if "data" in d and isinstance(d["data"], dict) and "users" in d["data"]:
+                return d["data"].get("users") or []
+
+    if hasattr(resp, "dict"):
+        d = resp.dict()
+        if isinstance(d, dict):
+            if "users" in d:
+                return d.get("users") or []
+            if "data" in d and isinstance(d["data"], dict) and "users" in d["data"]:
+                return d["data"].get("users") or []
+
     return []
 
 def find_user_id_by_email(sb: Client, email: str) -> Optional[str]:
@@ -255,16 +275,30 @@ def find_user_id_by_email(sb: Client, email: str) -> Optional[str]:
     if not target:
         return None
 
+
     page = 1
     per_page = 1000
+
     while True:
         resp = sb.auth.admin.list_users(page=page, per_page=per_page)
         users = _extract_users_from_admin_list(resp)
 
+        if not users and page == 1:
+            return None
+
         for u in users:
-            u_email = (u.get("email") if isinstance(u, dict) else getattr(u, "email", "")) or ""
-            if u_email.strip().lower() == target:
-                return u.get("id") if isinstance(u, dict) else getattr(u, "id", None)
+            u_email = ""
+            u_id = None
+
+            if isinstance(u, dict):
+                u_email = (u.get("email") or "").strip().lower()
+                u_id = u.get("id")
+            else:
+                u_email = (getattr(u, "email", "") or "").strip().lower()
+                u_id = getattr(u, "id", None)
+
+            if u_email == target:
+                return u_id
 
         if len(users) < per_page:
             break
