@@ -239,75 +239,27 @@ def delete_resource(sb: Client, project_id: int, user_id: str, res_id: int) -> b
     res = sb.table("resources").delete().eq("id", res_id).eq("project_id", project_id).execute()
     return bool(data(res))
 
-def _extract_users_from_admin_list(resp):
-    if hasattr(resp, "users"):
-        return resp.users or []
-
-    if hasattr(resp, "data") and hasattr(resp.data, "users"):
-        return resp.data.users or []
-
-    if isinstance(resp, dict):
-        if "users" in resp:
-            return resp.get("users") or []
-        if "data" in resp and isinstance(resp["data"], dict) and "users" in resp["data"]:
-            return resp["data"].get("users") or []
-
-    if hasattr(resp, "model_dump"):
-        d = resp.model_dump()
-        if isinstance(d, dict):
-            if "users" in d:
-                return d.get("users") or []
-            if "data" in d and isinstance(d["data"], dict) and "users" in d["data"]:
-                return d["data"].get("users") or []
-
-    if hasattr(resp, "dict"):
-        d = resp.dict()
-        if isinstance(d, dict):
-            if "users" in d:
-                return d.get("users") or []
-            if "data" in d and isinstance(d["data"], dict) and "users" in d["data"]:
-                return d["data"].get("users") or []
-
-    return []
 
 def find_user_id_by_email(sb: Client, email: str) -> Optional[str]:
     target = (email or "").strip().lower()
     if not target:
         return None
 
+    res = (
+        sb.table("user_profiles")
+        .select("id")
+        .eq("email", target)
+        .limit(1)
+        .execute()
+    )
+    if error(res):
+        raise RuntimeError(str(error(res)))
 
-    page = 1
-    per_page = 1000
-
-    while True:
-        resp = sb.auth.admin.list_users(page=page, per_page=per_page)
-        users = _extract_users_from_admin_list(resp)
-
-        if not users and page == 1:
-            return None
-
-        for u in users:
-            u_email = ""
-            u_id = None
-
-            if isinstance(u, dict):
-                u_email = (u.get("email") or "").strip().lower()
-                u_id = u.get("id")
-            else:
-                u_email = (getattr(u, "email", "") or "").strip().lower()
-                u_id = getattr(u, "id", None)
-
-            if u_email == target:
-                return u_id
-
-        if len(users) < per_page:
-            break
-        page += 1
-
-    return None
+    rows = data(res) or []
+    return rows[0]["id"] if rows else None
 
 def add_project_member_by_email(sb: Client, project_id: int, owner_user_id: str, email: str, role: str = "editor") -> Dict:
-    # Nur Owner darf einladen
+    
     if not ensure_project_owned(sb, project_id, owner_user_id):
         raise PermissionError("Only the project owner can invite members")
 
