@@ -3,15 +3,18 @@ let allProjects = [];
 let supabaseClient = null;
 let accessToken = null;
 
+// UI-Zustand basierend auf Login-Status anpassen
 function setAuthUI(loggedIn) {
   document.body.classList.toggle('logged-out', !loggedIn);
   document.getElementById('auth-overlay').style.display = loggedIn ? 'none' : 'flex';
+  document.querySelector('.sidebar').style.display = 'block';
+  document.querySelector('.content').style.display = 'block';
   document.getElementById('side-nav').style.display = loggedIn ? 'block' : 'none';
-  
   const newBtn = document.querySelector('.btn-new-project');
   if (newBtn) newBtn.style.display = loggedIn ? 'block' : 'none';
 }
 
+// Zentrale Fetch-Funktion mit Auth-Header
 async function apiFetch(url, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (!headers['Content-Type'] && options.method && options.method !== 'GET') {
@@ -23,6 +26,7 @@ async function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers });
 }
 
+// Initialisierung der Authentifizierung
 async function initAuth() {
   supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
 
@@ -46,14 +50,17 @@ async function signUp() {
 
   const { error, data } = await supabaseClient.auth.signUp({ email, password });
   if (error) { msg.textContent = error.message; return; }
-  msg.textContent = data?.session ? "Eingeloggt." : "Bitte E-Mail bestätigen.";
+  msg.textContent = data?.session ? "Account erstellt & eingeloggt." : "Account erstellt. Bitte E-Mail bestätigen.";
 }
 
 async function signIn() {
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
+  const msg = document.getElementById('auth-msg');
+
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) document.getElementById('auth-msg').textContent = error.message;
+  if (error) { msg.textContent = error.message; return; }
+  msg.textContent = "";
 }
 
 async function signOut() {
@@ -62,133 +69,166 @@ async function signOut() {
 
 async function loadData() {
   const res = await apiFetch('/api/projects');
-  if (!res.ok) {
-    console.error("Fehler beim Laden:", await res.text());
-    return;
-  }
+  if (!res.ok) { console.error(await res.text()); return; }
   allProjects = await res.json();
   renderUI();
 }
 
 function renderUI() {
-  const nav = document.getElementById('side-nav');
-  const grid = document.getElementById('project-grid');
-  nav.innerHTML = '';
-  grid.innerHTML = '';
+    const nav = document.getElementById('side-nav');
+    const grid = document.getElementById('project-grid');
+    
+    nav.innerHTML = '';
+    grid.innerHTML = '';
 
-  allProjects.forEach(p => {
-    nav.innerHTML += `<li onclick="openProject(${p.id})">${p.name}</li>`;
-    grid.innerHTML += `
-      <div class="card" onclick="openProject(${p.id})">
-        <h3>${p.name}</h3>
-        <p>${p.todos.length} Aufgaben</p>
-      </div>`;
-  });
+    allProjects.forEach(p => {
+        nav.innerHTML += `<li onclick="openProject(${p.id})">${p.name}</li>`;
+        grid.innerHTML += `
+            <div class="card" onclick="openProject(${p.id})">
+                <h3>${p.name}</h3>
+                <p>${p.todos.length} Aufgaben</p>
+            </div>`;
+    });
 }
 
 async function addProject() {
-  const name = prompt("Projektname:");
-  if (!name) return;
-  const res = await apiFetch('/api/projects', { 
-    method: 'POST', 
-    body: JSON.stringify({ name }) 
-  });
-  if (res.ok) loadData();
+    const name = prompt("Projektname:");
+    if (!name) return;
+    await apiFetch('/api/projects', { method:'POST', body: JSON.stringify({name}) });
+    loadData();
 }
 
 async function shareCurrentProject() {
   if (!currentProjectId) return;
-  const email = prompt("E-Mail des Users:");
+
+  const email = prompt("E-Mail des Users, den du einladen willst:");
   if (!email) return;
 
   const resp = await apiFetch(`/api/projects/${currentProjectId}/members`, {
     method: 'POST',
     body: JSON.stringify({ email })
   });
-  alert(resp.ok ? "User eingeladen." : "Fehler: " + await resp.text());
+
+  if (!resp.ok) {
+    alert("Fehler beim Einladen: " + await resp.text());
+    return;
+  }
+
+  alert("User wurde eingeladen.");
 }
 
 function openProject(id) {
   const project = allProjects.find(p => String(p.id) === String(id));
-  if (!project) return;
+  if (!project) {
+    alert("Projekt nicht gefunden.");
+    return;
+  }
 
   currentProjectId = project.id;
+
   document.getElementById('dashboard').style.display = 'none';
   document.getElementById('project-detail').style.display = 'block';
   document.getElementById('detail-title').innerText = project.name;
 
-  document.getElementById('todo-list').innerHTML = project.todos.map(todo => `
-    <li class="${todo.done ? 'completed' : ''}">
+  // Listen rendern
+  document.getElementById('todo-list').innerHTML =
+    project.todos.map((todo) => 
+    `<li class="${todo.done ? 'completed' : ''}">
       <label>
-        <input type="checkbox" class="todo-toggle" data-id="${todo.id}" ${todo.done ? 'checked' : ''}>
-        <span>${todo.content}</span>
+      <input type="checkbox" class="todo-checkbox" data-id="${todo.id}" ${todo.done ? 'checked' : ''}>
+      <span class="todo-text">${todo.content}</span>
       </label>
       <button class="btn-delete" data-id="${todo.id}" data-type="todo">🗑️</button>
-    </li>`).join('');
+    </li>`
+    ).join('');
 
-  document.getElementById('res-list').innerHTML = project.resources.map(res => `
-    <li class="${res.purchased ? 'completed' : ''}">
-      <span>${res.name} ${res.category ? `<small>(${res.category})</small>` : ''}</span>
-      <input type="number" class="res-qty" value="${res.quantity || 1}" min="1" data-id="${res.id}">
-      <input type="checkbox" class="res-toggle" data-id="${res.id}" ${res.purchased ? 'checked' : ''}>
-      <button class="btn-delete" data-id="${res.id}" data-type="resource">🗑️</button>
-    </li>`).join('');
+  document.getElementById('res-list').innerHTML =
+    project.resources.map((res) => `
+      <li class="${res.purchased ? 'completed' : ''}">
+        <span class="res-text">
+          ${res.name}
+          ${res.category ? `<small style="color: #64748b; font-size: 0.85em; margin-left: 8px;">(${res.category})</small>` : ''}
+        </span>
+        <input type="number"
+               class="res-quantity"
+               value="${res.quantity ?? 1}"
+               min="1"
+               data-id="${res.id}">
+        <input type="checkbox"
+               class="res-checkbox"
+               data-id="${res.id}"
+               ${res.purchased ? 'checked' : ''}>
+        <button class="btn-delete" data-id="${res.id}" data-type="resource">🗑️</button>
+      </li>
+    `).join('');
 
-  setupEventListeners(project);
-}
-
-function setupEventListeners(project) {
-  // Checkboxen für To-Dos
-  document.querySelectorAll('.todo-toggle').forEach(cb => {
-    cb.onchange = async (e) => {
+  // Todo Toggle
+  document.querySelectorAll('.todo-checkbox').forEach(cb => {
+    cb.addEventListener('change', async (e) => {
+      const todoId = e.target.dataset.id;
       const done = e.target.checked;
-      const res = await apiFetch(`/api/projects/${currentProjectId}/todos/${cb.dataset.id}`, {
-        method: 'PATCH', body: JSON.stringify({ done })
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/todos/${todoId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ done })
       });
-      if (res.ok) {
-        const t = project.todos.find(x => String(x.id) === cb.dataset.id);
-        if (t) t.done = done;
-        openProject(currentProjectId);
-      }
-    };
+      if (!resp.ok) { alert("Fehler beim Speichern."); return; }
+      const t = project.todos.find(x => String(x.id) === String(todoId));
+      if (t) t.done = done;
+      openProject(currentProjectId); // UI Refresh
+    });
   });
 
-  // Checkboxen für Ressourcen
-  document.querySelectorAll('.res-toggle').forEach(cb => {
-    cb.onchange = async (e) => {
+  // Resource Toggle
+  document.querySelectorAll('.res-checkbox').forEach(cb => {
+    cb.addEventListener('change', async (e) => {
+      const resId = e.target.dataset.id;
       const purchased = e.target.checked;
-      const res = await apiFetch(`/api/projects/${currentProjectId}/resources/${cb.dataset.id}`, {
-        method: 'PATCH', body: JSON.stringify({ purchased })
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ purchased })
       });
-      if (res.ok) {
-        const r = project.resources.find(x => String(x.id) === cb.dataset.id);
-        if (r) r.purchased = purchased;
-        openProject(currentProjectId);
-      }
-    };
+      if (!resp.ok) { alert("Fehler beim Speichern."); return; }
+      const r = project.resources.find(x => String(x.id) === String(resId));
+      if (r) r.purchased = purchased;
+      openProject(currentProjectId);
+    });
   });
 
-  // Mengenänderung
-  document.querySelectorAll('.res-qty').forEach(inp => {
-    inp.onchange = async (e) => {
-      const quantity = parseInt(e.target.value) || 1;
-      await apiFetch(`/api/projects/${currentProjectId}/resources/${inp.dataset.id}`, {
-        method: 'PATCH', body: JSON.stringify({ quantity })
+  // Quantity Änderung
+  document.querySelectorAll('.res-quantity').forEach(inp => {
+    inp.addEventListener('change', async (e) => {
+      const resId = e.target.dataset.id;
+      let quantity = parseInt(e.target.value, 10);
+      if (!Number.isFinite(quantity) || quantity < 1) quantity = 1;
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/resources/${resId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ quantity })
       });
-    };
+      if (!resp.ok) { alert("Fehler beim Speichern."); return; }
+      const r = project.resources.find(x => String(x.id) === String(resId));
+      if (r) r.quantity = quantity;
+    });
   });
 
-  // Löschen
+  // NEU: Löschen-Buttons (muss in openProject stehen!)
   document.querySelectorAll('.btn-delete').forEach(btn => {
-    btn.onclick = async () => {
-      if (!confirm("Löschen?")) return;
-      const endpoint = btn.dataset.type === 'todo' ? 'todos' : 'resources';
-      const res = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${btn.dataset.id}`, {
+    btn.onclick = async (e) => {
+      e.stopPropagation(); 
+      const id = btn.dataset.id;
+      const type = btn.dataset.type;
+
+      if (!confirm("Diesen Eintrag wirklich löschen?")) return;
+
+      const endpoint = type === 'todo' ? 'todos' : 'resources';
+      const resp = await apiFetch(`/api/projects/${currentProjectId}/${endpoint}/${id}`, {
         method: 'DELETE'
       });
-      if (res.ok) {
+
+      if (resp.ok) {
         await loadData();
         openProject(currentProjectId);
+      } else {
+        alert("Fehler beim Löschen.");
       }
     };
   });
@@ -196,7 +236,7 @@ function setupEventListeners(project) {
 
 async function saveItem(type) {
   const input = document.getElementById(type === 'todo' ? 'todo-input' : 'res-input');
-  const content = input.value.trim();
+  const content = (input.value || '').trim();
   if (!content) return;
 
   const resp = await apiFetch(`/api/projects/${currentProjectId}/items`, {
@@ -204,19 +244,18 @@ async function saveItem(type) {
     body: JSON.stringify({ type, content })
   });
 
-  if (resp.ok) {
-    const updated = await resp.json();
-    const idx = allProjects.findIndex(p => String(p.id) === String(updated.id));
-    if (idx >= 0) allProjects[idx] = updated;
-    input.value = '';
-    renderUI();
-    openProject(updated.id);
-  }
+  if (!resp.ok) { alert("Fehler beim Speichern."); return; }
+  const updatedProject = await resp.json();
+  const idx = allProjects.findIndex(p => String(p.id) === String(updatedProject.id));
+  if (idx >= 0) allProjects[idx] = updatedProject;
+  input.value = '';
+  renderUI();
+  openProject(updatedProject.id);
 }
 
 function showDashboard() {
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('project-detail').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    document.getElementById('project-detail').style.display = 'none';
 }
 
 initAuth();
