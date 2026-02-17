@@ -201,14 +201,21 @@ def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purc
     if not ensure_project_access(sb, project_id, user_id):
         return False
 
-    patch = {k: v for k, v in kwargs.items() if v is not None}
+    # KORREKTUR: Dictionary explizit aufbauen
+    patch = {}
+    if purchased is not None:
+        patch["purchased"] = purchased
+    if quantity is not None:
+        patch["quantity"] = quantity
+    if category_id is not None:
+        patch["category_id"] = category_id
+
     if "quantity" in patch:
-        patch = {k: v for k, v in kwargs.items() if v is not None}
+        patch["quantity"] = max(1, int(patch["quantity"]))
 
     if not patch: return True
 
     res = sb.table("resources").update(patch).eq("id", res_id).eq("project_id", project_id).execute()
-    
     # Automatisches Lernen für den Cache bei manueller Kategoriewahl
     if "category_id" in patch and data(res):
         try:
