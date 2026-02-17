@@ -203,7 +203,7 @@ def update_resource(sb: Client, project_id: int, user_id: str, res_id: int, purc
 
     patch = {k: v for k, v in kwargs.items() if v is not None}
     if "quantity" in patch:
-        patch["quantity"] = max(1, int(patch["quantity"]))
+        patch = {k: v for k, v in kwargs.items() if v is not None}
 
     if not patch: return True
 
