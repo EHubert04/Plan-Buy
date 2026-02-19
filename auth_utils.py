@@ -1,9 +1,7 @@
 from flask import request, abort
 from supabase_utils import get_supabase_public
 
-
 def require_user_id() -> str:
-    """Reads Authorization: Bearer <JWT> and returns user id, otherwise abort(401)."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         abort(401)

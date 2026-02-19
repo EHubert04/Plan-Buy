@@ -4,7 +4,6 @@ import sys
 import time
 from huggingface_hub import InferenceClient
 
-# Wir nutzen das Zero-Shot Modell via Router
 MODEL_ID = "vicgalle/xlm-roberta-large-xnli-anli"
 HF_API_URL = f"https://router.huggingface.co/models/{MODEL_ID}"
 HF_TOKEN = os.environ.get("HF_TOKEN") 
@@ -59,7 +58,6 @@ def get_ai_category_name(valid_categories_names, item_name):
 
         if best_label:
             sys.stderr.write(f"DEBUG: KI Ergebnis: '{best_label}' ({best_score:.2f})\n")
-            # Schwellenwert auf 0.3 angepasst
             if best_score > 0.3:
                 return best_label
         
@@ -74,7 +72,6 @@ def get_category_id_for_item(sb, name):
     if not name: return None
     name_clean = name.lower().strip()
 
-    # 1. Cache prüfen
     try:
         res = sb.table("categorization_cache").select("category_id").eq("keyword", name_clean).execute()
         if res.data and res.data[0]['category_id']:
@@ -85,7 +82,6 @@ def get_category_id_for_item(sb, name):
     all_categories = get_db_categories(sb)
     if not all_categories: return None 
 
-    # 2. Exakter Keyword-Match (fängt das Offensichtliche ab)
     for cat in all_categories:
         if any(kw in name_clean for kw in cat["keywords"]):
             sys.stderr.write(f"DEBUG: Keyword Treffer für '{name_clean}' -> {cat['name']}\n")
@@ -96,16 +92,11 @@ def get_category_id_for_item(sb, name):
             except: pass
             return cat["id"]
 
-    # 3. KI Anfrage VORBEREITEN: Nur reine Namen verwenden (ohne Keywords)
-    # Wir bauen eine Map: "Kategoriename" -> "Original Kategorie Objekt"
     label_map = {cat['name']: cat for cat in all_categories}
     candidate_labels = list(label_map.keys())
-
-    # 4. KI Fragen (mit den sauberen Namen)
     found_category_name = get_ai_category_name(candidate_labels, name)
 
     if found_category_name:
-        # 5. Rückauflösung: ID über den Namen finden
         matched_cat = label_map.get(found_category_name)
         
         if matched_cat:
@@ -119,7 +110,6 @@ def get_category_id_for_item(sb, name):
             except: pass
             return matched_cat["id"]
 
-    # Fallback: Sonstiges
     for cat in all_categories:
         if cat["name"].lower() == "sonstiges":
             return cat["id"]
