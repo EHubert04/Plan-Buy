@@ -184,7 +184,7 @@ def add_item(sb: Client, project_id: int, user_id: str, item_type: str, content:
             "category_id": cat_id
         }
         res = sb.table("resources").insert(payload).execute()
-
+ 
     if error(res):
         raise RuntimeError(str(error(res)))
 

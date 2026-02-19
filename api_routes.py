@@ -15,11 +15,9 @@ from repo import (
 
 api_bp = Blueprint("api", __name__)
 
-
 @api_bp.get("/health/app")
 def health_app():
     return {"ok": True}, 200
-
 
 @api_bp.get("/health/db")
 def health_db():
@@ -32,7 +30,6 @@ def health_db():
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
 
-
 @api_bp.get("/api/projects")
 def get_projects():
     try:
@@ -43,7 +40,6 @@ def get_projects():
         return jsonify({"error": "unauthorized"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @api_bp.post("/api/projects")
 def add_project_route():
@@ -61,7 +57,6 @@ def add_project_route():
         return jsonify({"error": "unauthorized"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @api_bp.post("/api/projects/<int:p_id>/items")
 def add_item_route(p_id: int):
@@ -95,7 +90,6 @@ def add_item_route(p_id: int):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @api_bp.patch("/api/projects/<int:p_id>/todos/<int:todo_id>")
 def update_todo_route(p_id: int, todo_id: int):
     try:
@@ -114,7 +108,6 @@ def update_todo_route(p_id: int, todo_id: int):
         return jsonify({"error": "unauthorized"}), e.code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @api_bp.patch("/api/projects/<int:p_id>/resources/<int:res_id>")
 def update_resource_route(p_id: int, res_id: int):

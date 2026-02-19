@@ -194,7 +194,6 @@ function openProject(id) {
     });
   });
 
-  // Quantity Änderung
   document.querySelectorAll('.res-quantity').forEach(inp => {
     inp.addEventListener('change', async (e) => {
       const resId = e.target.dataset.id;
@@ -210,7 +209,6 @@ function openProject(id) {
     });
   });
 
-  // NEU: Löschen-Buttons (muss in openProject stehen!)
   document.querySelectorAll('.btn-delete').forEach(btn => {
     btn.onclick = async (e) => {
       e.stopPropagation(); 
